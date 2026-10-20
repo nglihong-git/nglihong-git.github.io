@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NG Hub — Tesla Authorization</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 2rem auto; max-width: 40rem; padding: 0 1rem; line-height: 1.5; }
+  code { background: #f0f0f0; padding: .75rem; display: block; word-break: break-all; border-radius: 6px; }
+  button { margin-top: .5rem; padding: .5rem 1rem; font-size: 1rem; }
+</style>
+</head>
+<body>
+<h1>NG Hub — Tesla authorization code</h1>
+<p id="status">Reading the code from the redirect…</p>
+<code id="code">(none found)</code>
+<button id="copy" hidden>Copy code</button>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const err = params.get('error');
+  const codeEl = document.getElementById('code');
+  const statusEl = document.getElementById('status');
+  const copyBtn = document.getElementById('copy');
+  if (err) {
+    statusEl.textContent = 'Tesla returned an error: ' + err + (params.get('error_description') ? ' — ' + params.get('error_description') : '');
+  } else if (code) {
+    statusEl.textContent = 'Copy this code and paste it back into the NG Hub setup to finish signing in:';
+    codeEl.textContent = code;
+    copyBtn.hidden = false;
+    copyBtn.addEventListener('click', () => navigator.clipboard.writeText(code));
+  }
+</script>
+</body>
+</html>
