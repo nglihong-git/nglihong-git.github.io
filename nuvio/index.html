@@ -3,34 +3,50 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Nuvio Torrentio Fix · local page</title>
+<title>Nuvio Account Manager · local page</title>
 <style>
   :root { color-scheme: dark; }
   body { font-family: -apple-system, system-ui, sans-serif; background:#0d1117; color:#e6edf3;
-         margin:0; padding:18px; max-width:720px; margin-inline:auto; line-height:1.45; }
+         margin:0; padding:18px; max-width:760px; margin-inline:auto; line-height:1.45; }
   h1 { font-size:22px; margin:4px 0 2px; }
+  h3 { margin:18px 0 8px; }
   .sub { color:#9da7b1; font-size:14px; margin-bottom:16px; }
   .card { background:#151b23; border:1px solid #2b333d; border-radius:12px; padding:14px; margin:12px 0; }
+  .card h2 { font-size:17px; margin:2px 0 10px; }
   label { display:block; font-size:13px; color:#9da7b1; margin:10px 0 4px; }
-  input { width:100%; box-sizing:border-box; padding:12px; border-radius:9px; border:1px solid #2b333d;
+  input, select { width:100%; box-sizing:border-box; padding:12px; border-radius:9px; border:1px solid #2b333d;
           background:#0d1117; color:#e6edf3; font-size:16px; }
+  input[type="checkbox"] { width:auto; padding:0; }
+  input[type="file"] { padding:9px; font-size:14px; }
   button { width:100%; padding:13px; border-radius:9px; border:0; font-size:16px; font-weight:600;
-           background:#1f6feb; color:#fff; margin-top:14px; }
+           background:#1f6feb; color:#fff; margin-top:14px; cursor:pointer; }
   button.secondary { background:#22303f; }
+  button.danger { background:#5a1d1d; }
+  button.small { width:auto; padding:8px 12px; font-size:14px; margin-top:0; }
   button:disabled { opacity:.45; }
+  .btnrow { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .btnrow button { width:auto; flex:1; margin-top:0; min-width:130px; }
   .privacy { background:#12281a; border:1px solid #1d4d2e; border-radius:12px; padding:12px 14px; font-size:14px; }
   .warn { background:#2b2110; border:1px solid #6b5316; border-radius:12px; padding:12px 14px; font-size:14px; }
   .mono { font-family: ui-monospace, monospace; font-size:12px; word-break: break-all; }
   .tag { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; background:#22303f; margin-left:6px; }
   .ok { color:#3fb950; } .bad { color:#f85149; } .dim { color:#9da7b1; }
+  .dirty { color:#e8b93e; font-size:13px; font-weight:600; }
+  .row { border:1px solid #2b333d; border-radius:10px; padding:10px; margin:10px 0; background:#10151c; }
+  .rowhead { display:flex; align-items:center; gap:6px; }
+  .rownum { font-weight:700; color:#9da7b1; }
+  .spacer { flex:1; }
+  .chk { display:inline-flex; align-items:center; gap:6px; font-size:14px; color:#e6edf3; margin:0; }
+  .torbox { margin-top:10px; background:#14202e; border:1px solid #274b73; border-radius:9px; padding:10px; font-size:14px; }
+  .torbox input[type="number"] { width:84px; display:inline-block; padding:8px; font-size:15px; }
   #log { white-space:pre-wrap; font-family:ui-monospace, monospace; font-size:12.5px; background:#0a0e13;
          border:1px solid #2b333d; border-radius:10px; padding:10px; min-height:60px; }
   .hidden { display:none; }
 </style>
 </head>
 <body>
-<h1>🎬 Nuvio Torrentio Fix</h1>
-<div class="sub">Caps Torrentio sources at <b>40GB</b> (<span class="mono">sizefilter=40gb</span>) on your Nuvio account. Everything else in the addon link stays untouched. <span class="dim">tool v1.2.0</span></div>
+<h1>🎬 Nuvio Account Manager</h1>
+<div class="sub">Universal tool for your Nuvio account: profiles, addons, plugins, cloning, backup and restore, plus the Torrentio size cap as a preset. Everything runs through the official Nuvio Cloud API. <span class="dim">tool v2.0.0</span></div>
 
 <div class="privacy">🔒 <b>How this page works:</b> it runs entirely in this browser tab and talks <b>only</b> to the official Nuvio API at <span class="mono">api.nuvio.tv</span>, the same API Nuvio's own apps use. Your password goes straight from this tab to Nuvio, it is <b>never stored</b>, and the sign-in token lives only in this tab's memory. Close the tab and everything is gone.</div>
 
@@ -39,17 +55,74 @@
   <input id="email" type="email" autocomplete="username" placeholder="you@example.com">
   <label for="password">Nuvio password</label>
   <input id="password" type="password" autocomplete="current-password" placeholder="••••••••">
-  <button id="scanBtn">Sign in &amp; scan my account</button>
+  <button id="signInBtn">Sign in &amp; load my account</button>
   <div id="loginMsg" style="margin-top:10px"></div>
 </div>
 
-<div id="results"></div>
+<div id="mainArea" class="hidden">
+  <div class="card">
+    <h2>👤 Profiles</h2>
+    <div id="accountLine" class="dim" style="font-size:14px"></div>
+    <label for="profilePicker">Selected profile</label>
+    <select id="profilePicker"></select>
+    <div id="profileMeta" style="margin-top:8px; font-size:14px"></div>
+    <div class="btnrow">
+      <button id="reloadProfileBtn" class="secondary">↻ Reload this profile</button>
+    </div>
+  </div>
 
-<div class="card hidden" id="actionCard">
-  <button id="applyBtn">✅ Apply the 40GB cap</button>
-  <button id="backupBtn" class="secondary">⬇️ Download backup of my addons (JSON)</button>
-  <button id="undoBtn" class="secondary hidden">↩️ Undo (restore the lists I pulled at scan time)</button>
-  <div class="warn" style="margin-top:12px">⚠️ Apply re-saves each changed profile's <b>complete</b> addon list with only the Torrentio link rewritten. Nothing else is pushed. After pushing, the page pulls your list again and verifies the cap is really there.</div>
+  <div class="card">
+    <h2>🧩 Addons <span id="addonsDirty" class="dirty"></span></h2>
+    <div id="addonsRows"></div>
+    <label for="newAddonName">New addon name</label>
+    <input id="newAddonName" type="text" placeholder="Addon name">
+    <label for="newAddonUrl">New addon URL</label>
+    <input id="newAddonUrl" type="text" placeholder="https://…">
+    <div class="btnrow">
+      <button id="addAddonBtn" class="secondary">＋ Add addon (local)</button>
+      <button id="pushAddonsBtn">⬆️ Push addons</button>
+      <button id="undoAddonsBtn" class="secondary" disabled>↩️ Undo addons</button>
+    </div>
+    <div class="warn" style="margin-top:12px">⚠️ Edits are <b>local</b> until you push. Push re-saves this profile's <b>complete</b> addon list (full replace on the server), then pulls it back and verifies the count. Before pushing, the page re-checks the server: if the list changed since you loaded it, the push aborts instead of overwriting.</div>
+  </div>
+
+  <div class="card">
+    <h2>🔌 Plugins <span id="pluginsDirty" class="dirty"></span></h2>
+    <div id="pluginsRows"></div>
+    <label for="newPluginName">New plugin name</label>
+    <input id="newPluginName" type="text" placeholder="Plugin name">
+    <label for="newPluginUrl">New plugin URL</label>
+    <input id="newPluginUrl" type="text" placeholder="https://…">
+    <div class="btnrow">
+      <button id="addPluginBtn" class="secondary">＋ Add plugin (local)</button>
+      <button id="pushPluginsBtn">⬆️ Push plugins</button>
+      <button id="undoPluginsBtn" class="secondary" disabled>↩️ Undo plugins</button>
+    </div>
+    <div class="warn" style="margin-top:12px">⚠️ Same rules as addons: local until pushed, complete list on push, verified by a pull afterwards, and the push aborts if the server list moved since you loaded it.</div>
+  </div>
+
+  <div class="card">
+    <h2>👥 Clone a profile</h2>
+    <label for="cloneSource">Copy addons &amp; plugins from</label>
+    <select id="cloneSource"></select>
+    <label for="cloneName">New profile name</label>
+    <input id="cloneName" type="text" placeholder="e.g. Kids, Guest, Bedroom TV">
+    <button id="cloneBtn">👥 Create cloned profile</button>
+    <div class="warn" style="margin-top:12px">⚠️ Clone pushes the <b>complete profiles list</b> (existing profiles exactly as pulled, plus the new one, full replace), then pushes the source profile's complete addon and plugin lists into the new profile, then re-pulls everything and verifies the new profile exists with matching counts. Max 6 profiles per account.</div>
+  </div>
+
+  <div class="card">
+    <h2>💾 Backup &amp; restore</h2>
+    <div class="btnrow">
+      <button id="backupLocalBtn" class="secondary">⬇️ Backup addons + plugins (JSON)</button>
+      <button id="backupServerBtn" class="secondary">⬇️ Full account backup (server)</button>
+    </div>
+    <label for="restoreFile">Restore from an addons + plugins backup file</label>
+    <input id="restoreFile" type="file" accept="application/json,.json">
+    <div id="restoreInfo" style="margin-top:8px; font-size:14px"></div>
+    <button id="restoreBtn" class="danger" disabled>⚠️ Restore from this file</button>
+    <div class="warn" style="margin-top:12px">⚠️ Restore <b>overwrites</b> the addon and plugin lists of every profile in the backup file with the file's contents (complete lists, full replace), then verifies each one by pulling it back. The server state as it was right before the restore is saved into Undo first, so a restore can be rolled back per profile and section.</div>
+  </div>
 </div>
 
 <h3>Log</h3>
@@ -58,9 +131,11 @@
 <script>
 const API = 'https://api.nuvio.tv';
 const PUB = 'sb_publishable_1Clq8rlTVACkdcZuqr6_AD__xUUC_EN';
-const S = { token: null, profiles: [], originals: {}, changedProfiles: [], originId: null };
-
 const $ = id => document.getElementById(id);
+const deep = o => JSON.parse(JSON.stringify(o));
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 function log(msg) {
   const t = new Date().toLocaleTimeString();
   $('log').textContent += ($('log').textContent === 'waiting…' ? '' : '\n') + '[' + t + '] ' + msg;
@@ -99,14 +174,15 @@ function getSizefilter(url) {
   }
   return null;
 }
-function withSizefilter(url) {
+function withSizefilter(url, label) {
   const p = splitConfig(url); if (!p) return null;
+  const val = label || '40gb';
   const segs = p.cfg ? p.cfg.split('|') : [];
   let done = false;
   for (let i = 0; i < segs.length; i++) {
-    if (segs[i].toLowerCase().startsWith('sizefilter=')) { segs[i] = 'sizefilter=40gb'; done = true; break; }
+    if (segs[i].toLowerCase().startsWith('sizefilter=')) { segs[i] = 'sizefilter=' + val; done = true; break; }
   }
-  if (!done) segs.push('sizefilter=40gb');
+  if (!done) segs.push('sizefilter=' + val);
   return p.base + '/' + segs.join('|') + (p.hadManifest ? '/manifest.json' : '');
 }
 const KNOWN_KEYS = ['providers','sort','qualityfilter','language','debridoptions','sizefilter','excludequality','resolutions','quality','limit','audio'];
@@ -127,8 +203,22 @@ function maskUrl(url) {
 function isTorrentio(a) {
   return (((a.name || '') + ' ' + (a.url || '')).toLowerCase().includes('torrentio'));
 }
+/* ---------- end Torrentio URL logic ---------- */
+
+const S = {
+  token: null, originId: null,
+  profiles: [],   // profile objects exactly as pulled
+  sel: null,      // selected profile_index
+  work: {},       // idx -> { addons: [editable deep copies], plugins: [...] }
+  base: {},       // idx -> { addons: rowCountAtLoad, plugins: rowCountAtLoad }
+  dirty: {},      // 'idx:addons' | 'idx:plugins' -> true when local edits exist
+  undo: {}        // 'idx:addons' | 'idx:plugins' -> { list, desc } last pushed-away server state
+};
 
 /* ---------- Account operations ---------- */
+async function pullProfiles() {
+  return await req('/rest/v1/rpc/sync_pull_profiles', { method: 'POST', body: {} });
+}
 async function pullAddons(idx) {
   return await req('/rest/v1/addons?select=*&profile_id=eq.' + idx + '&order=sort_order.asc');
 }
@@ -146,13 +236,29 @@ async function ensureOriginId() {
   log('sync origin client id: registered a new one for this tool');
   return S.originId;
 }
-async function pushAddons(idx, list) {
+async function pushAddonsRpc(idx, list) {
   const origin = await ensureOriginId();
   return await req('/rest/v1/rpc/sync_push_addons', { method: 'POST', body: { p_profile_id: idx, p_addons: list, p_origin_client_id: origin } });
 }
+async function pushPluginsRpc(idx, list) {
+  const origin = await ensureOriginId();
+  return await req('/rest/v1/rpc/sync_push_plugins', { method: 'POST', body: { p_profile_id: idx, p_plugins: list, p_origin_client_id: origin } });
+}
+function pullSection(idx, kind) { return kind === 'addons' ? pullAddons(idx) : pullPlugins(idx); }
+function pushSectionRpc(idx, kind, list) { return kind === 'addons' ? pushAddonsRpc(idx, list) : pushPluginsRpc(idx, list); }
+async function loadProfileData(idx) {
+  const addons = await pullAddons(idx);
+  const plugins = await pullPlugins(idx);
+  S.work[idx] = { addons: deep(addons), plugins: deep(plugins) };
+  S.base[idx] = { addons: addons.length, plugins: plugins.length };
+  delete S.dirty[idx + ':addons'];
+  delete S.dirty[idx + ':plugins'];
+  log('profile ' + idx + ': loaded ' + addons.length + ' addons, ' + plugins.length + ' plugins');
+}
 
-async function scan() {
-  $('scanBtn').disabled = true;
+/* ---------- Sign in + profile picker ---------- */
+async function signIn() {
+  $('signInBtn').disabled = true;
   $('loginMsg').innerHTML = '';
   try {
     const email = $('email').value.trim();
@@ -164,137 +270,385 @@ async function scan() {
     $('password').value = '';
     const user = await req('/auth/v1/user');
     log('signed in as ' + (user.email || email));
-    const profiles = await req('/rest/v1/rpc/sync_pull_profiles', { method: 'POST', body: {} });
+    await ensureOriginId();
+    const profiles = await pullProfiles();
     if (!Array.isArray(profiles) || !profiles.length) throw new Error('no profiles came back');
-    S.profiles = []; S.originals = {}; S.changedProfiles = [];
+    S.profiles = profiles;
+    log(profiles.length + ' profile(s) on this account');
+    $('accountLine').textContent = 'Signed in as ' + (user.email || email) + ' · ' + profiles.length + ' profile(s)';
+    $('loginCard').classList.add('hidden');
+    $('mainArea').classList.remove('hidden');
+    $('loginMsg').innerHTML = '<span class="ok">✅ signed in</span>';
+    buildPicker(profiles[0].profile_index);
+    await selectProfile(profiles[0].profile_index);
+  } catch (e) {
+    $('loginMsg').innerHTML = '<span class="bad">❌ ' + esc(e.message) + '</span>';
+    log('error: ' + e.message);
+  } finally {
+    $('signInBtn').disabled = false;
+  }
+}
+function profileLabel(p) { return (p.name || 'Profile') + ' (#' + p.profile_index + ')'; }
+function buildPicker(selectedIdx) {
+  const opts = S.profiles.map(p => '<option value="' + p.profile_index + '"' + (p.profile_index === selectedIdx ? ' selected' : '') + '>' + esc(profileLabel(p)) + '</option>').join('');
+  $('profilePicker').innerHTML = opts;
+  $('cloneSource').innerHTML = opts;
+}
+async function selectProfile(idx) {
+  S.sel = idx;
+  const p = S.profiles.find(x => x.profile_index === idx);
+  $('profilePicker').value = String(idx);
+  let meta = '<b>👤 ' + esc(p ? (p.name || 'Profile ' + idx) : 'Profile ' + idx) + '</b>';
+  if (p && p.is_primary) meta += '<span class="tag">primary</span>';
+  if (p && p.uses_primary_addons) meta += '<span class="tag">uses primary addons</span>';
+  if (p && p.uses_primary_plugins) meta += '<span class="tag">uses primary plugins</span>';
+  $('profileMeta').innerHTML = meta;
+  if (!S.work[idx]) await loadProfileData(idx);
+  renderSection('addons');
+  renderSection('plugins');
+  refreshDirtyLabels();
+  refreshUndoButtons();
+}
+async function reloadProfile() {
+  const idx = S.sel;
+  if (idx == null) return;
+  if (S.dirty[idx + ':addons'] || S.dirty[idx + ':plugins']) {
+    if (!confirm('This profile has unsaved local edits. Reloading throws them away. Reload anyway?')) return;
+  }
+  try {
+    await loadProfileData(idx);
+    renderSection('addons');
+    renderSection('plugins');
+    refreshDirtyLabels();
+    log('profile ' + idx + ': reloaded from the server');
+  } catch (e) { log('error reloading profile ' + idx + ': ' + e.message); }
+}
+
+/* ---------- Editors ---------- */
+function markDirty(kind) {
+  S.dirty[S.sel + ':' + kind] = true;
+  refreshDirtyLabels();
+}
+function refreshDirtyLabels() {
+  const idx = S.sel;
+  $('addonsDirty').textContent = idx != null && S.dirty[idx + ':addons'] ? '● unsaved local changes' : '';
+  $('pluginsDirty').textContent = idx != null && S.dirty[idx + ':plugins'] ? '● unsaved local changes' : '';
+}
+function refreshUndoButtons() {
+  const idx = S.sel;
+  const a = idx != null ? S.undo[idx + ':addons'] : null;
+  const pl = idx != null ? S.undo[idx + ':plugins'] : null;
+  $('undoAddonsBtn').disabled = !a;
+  $('undoAddonsBtn').textContent = a ? '↩️ Undo addons (' + a.list.length + ' rows, ' + a.desc + ')' : '↩️ Undo addons';
+  $('undoPluginsBtn').disabled = !pl;
+  $('undoPluginsBtn').textContent = pl ? '↩️ Undo plugins (' + pl.list.length + ' rows, ' + pl.desc + ')' : '↩️ Undo plugins';
+}
+function renderSection(kind) {
+  const idx = S.sel;
+  const box = $(kind + 'Rows');
+  if (idx == null || !S.work[idx]) { box.innerHTML = ''; return; }
+  const list = S.work[idx][kind];
+  if (!list.length) { box.innerHTML = '<div class="dim">none on this profile yet, add one below</div>'; return; }
+  box.innerHTML = list.map((row, i) => {
+    let h = '<div class="row" data-i="' + i + '">';
+    h += '<div class="rowhead"><span class="rownum">#' + (i + 1) + '</span>' +
+      '<label class="chk"><input type="checkbox" data-f="enabled"' + (row.enabled ? ' checked' : '') + '> enabled</label>' +
+      '<span class="spacer"></span>' +
+      '<button class="small secondary" data-act="up">↑</button>' +
+      '<button class="small secondary" data-act="down">↓</button>' +
+      '<button class="small danger" data-act="del">🗑</button></div>';
+    h += '<label>name</label><input type="text" data-f="name" value="' + esc(row.name || '') + '">';
+    h += '<label>url</label><input type="text" data-f="url" value="' + esc(row.url || '') + '">';
+    if (kind === 'addons' && isTorrentio(row)) {
+      const cur = getSizefilter(row.url);
+      h += '<div class="torbox">🎯 <b>Torrentio size cap</b><br>current cap: <b>' + (cur === null ? 'none set' : esc(cur)) + '</b>' +
+        '<div class="mono dim" style="margin:4px 0">' + esc(maskUrl(row.url)) + '</div>' +
+        '<input type="number" data-tgb value="40" min="1" max="1000"> GB ' +
+        '<button class="small" data-act="setcap">Set cap (local)</button></div>';
+    }
+    h += '</div>';
+    return h;
+  }).join('');
+  box.querySelectorAll('.row').forEach(rowEl => wireRow(kind, rowEl, parseInt(rowEl.getAttribute('data-i'), 10)));
+}
+function wireRow(kind, rowEl, i) {
+  const list = S.work[S.sel][kind];
+  const row = list[i];
+  rowEl.querySelector('[data-f="name"]').addEventListener('input', e => { row.name = e.target.value; markDirty(kind); });
+  rowEl.querySelector('[data-f="url"]').addEventListener('input', e => { row.url = e.target.value; markDirty(kind); });
+  rowEl.querySelector('[data-f="enabled"]').addEventListener('change', e => { row.enabled = e.target.checked; markDirty(kind); });
+  rowEl.querySelector('[data-act="up"]').addEventListener('click', () => {
+    if (i <= 0) return;
+    const t = list[i - 1]; list[i - 1] = list[i]; list[i] = t;
+    markDirty(kind); renderSection(kind);
+  });
+  rowEl.querySelector('[data-act="down"]').addEventListener('click', () => {
+    if (i >= list.length - 1) return;
+    const t = list[i + 1]; list[i + 1] = list[i]; list[i] = t;
+    markDirty(kind); renderSection(kind);
+  });
+  rowEl.querySelector('[data-act="del"]').addEventListener('click', () => {
+    if (!confirm('Remove "' + (row.name || row.url || 'this row') + '" from the local list? It only disappears on the server when you push.')) return;
+    list.splice(i, 1);
+    markDirty(kind); renderSection(kind);
+    log(kind + ': removed a row locally (' + list.length + ' left), not pushed yet');
+  });
+  const setBtn = rowEl.querySelector('[data-act="setcap"]');
+  if (setBtn) setBtn.addEventListener('click', () => {
+    const gb = parseInt(rowEl.querySelector('[data-tgb]').value, 10);
+    if (!gb || gb < 1) { log('torrentio preset: enter a GB number of 1 or more'); return; }
+    const nu = withSizefilter(row.url, gb + 'gb');
+    if (!nu) { log('torrentio preset: could not parse this URL, no change made'); return; }
+    if (nu === row.url) { log('torrentio preset: cap is already ' + gb + 'gb'); return; }
+    row.url = nu;
+    markDirty('addons');
+    renderSection('addons');
+    log('torrentio preset: local URL now ' + maskUrl(nu) + ' (cap ' + gb + 'gb), push addons to save it');
+  });
+}
+function addRow(kind) {
+  const idx = S.sel;
+  if (idx == null || !S.work[idx]) return;
+  const nameEl = $(kind === 'addons' ? 'newAddonName' : 'newPluginName');
+  const urlEl = $(kind === 'addons' ? 'newAddonUrl' : 'newPluginUrl');
+  const url = urlEl.value.trim();
+  if (!url) { log(kind + ': enter a URL for the new row first'); return; }
+  const list = S.work[idx][kind];
+  list.push({ url: url, name: nameEl.value.trim() || url, enabled: true, sort_order: list.length, profile_id: idx });
+  nameEl.value = ''; urlEl.value = '';
+  markDirty(kind);
+  renderSection(kind);
+  log(kind + ': added a row locally (' + list.length + ' total), not pushed yet');
+}
+
+/* ---------- Push + undo (complete lists, concurrency guard, verify pull) ---------- */
+async function pushSection(kind, btn) {
+  const idx = S.sel;
+  if (idx == null || !S.work[idx]) return;
+  btn.disabled = true;
+  try {
+    const remote = await pullSection(idx, kind);
+    if (remote.length !== S.base[idx][kind]) {
+      log('⚠️ push ABORTED, profile ' + idx + ' ' + kind + ': the server now has ' + remote.length +
+        ' rows but you loaded ' + S.base[idx][kind] + '. Something changed it since (another device?). Reload the profile and re-apply your edits. Nothing was pushed.');
+      return;
+    }
+    const payload = S.work[idx][kind].map((r, i) => { const o = Object.assign({}, r); o.sort_order = i; return o; });
+    S.undo[idx + ':' + kind] = { list: deep(remote), desc: 'state before push ' + new Date().toLocaleTimeString() };
+    await pushSectionRpc(idx, kind, payload);
+    log('profile ' + idx + ': pushed ' + payload.length + ' ' + kind);
+    const check = await pullSection(idx, kind);
+    const ok = check.length === payload.length;
+    log('profile ' + idx + ': verify pull, ' + check.length + ' ' + kind + ' ' + (ok ? '✅ count matches' : '❌ COUNT MISMATCH, check the account before pushing again'));
+    S.work[idx][kind] = deep(check);
+    S.base[idx][kind] = check.length;
+    delete S.dirty[idx + ':' + kind];
+    renderSection(kind);
+    refreshDirtyLabels();
+    refreshUndoButtons();
+  } catch (e) {
+    log('error pushing ' + kind + ' for profile ' + idx + ': ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+async function undoSection(kind, btn) {
+  const idx = S.sel;
+  const slot = idx != null ? S.undo[idx + ':' + kind] : null;
+  if (!slot) return;
+  btn.disabled = true;
+  try {
+    const current = await pullSection(idx, kind);
+    const target = deep(slot.list).map((r, i) => { const o = Object.assign({}, r); o.sort_order = i; return o; });
+    await pushSectionRpc(idx, kind, target);
+    log('profile ' + idx + ': undo pushed ' + target.length + ' ' + kind + ' (' + slot.desc + ')');
+    const check = await pullSection(idx, kind);
+    log('profile ' + idx + ': verify pull after undo, ' + check.length + ' ' + kind + ' ' + (check.length === target.length ? '✅ count matches' : '❌ COUNT MISMATCH'));
+    S.undo[idx + ':' + kind] = { list: deep(current), desc: 'state before undo ' + new Date().toLocaleTimeString() };
+    S.work[idx][kind] = deep(check);
+    S.base[idx][kind] = check.length;
+    delete S.dirty[idx + ':' + kind];
+    renderSection(kind);
+    refreshDirtyLabels();
+    refreshUndoButtons();
+  } catch (e) {
+    log('error during undo of ' + kind + ' for profile ' + idx + ': ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ---------- Clone profile ---------- */
+async function cloneProfile(btn) {
+  btn.disabled = true;
+  try {
+    const srcIdx = parseInt($('cloneSource').value, 10);
+    const newName = $('cloneName').value.trim();
+    if (!newName) { log('clone: enter a name for the new profile first'); return; }
+    const profiles = await pullProfiles();
+    if (profiles.length >= 6) { log('clone: ABORTED, this account already has 6 profiles, the max'); return; }
+    const src = profiles.find(p => p.profile_index === srcIdx);
+    if (!src) { log('clone: ABORTED, source profile ' + srcIdx + ' not found'); return; }
+    const newIdx = Math.max.apply(null, profiles.map(p => p.profile_index)) + 1;
+    const np = deep(src);
+    np.profile_index = newIdx;
+    np.name = newName;
+    np.is_primary = false;
+    const droppedId = ('id' in np);
+    if (droppedId) delete np.id;
+    const full = profiles.concat([np]);
+    log('clone: pushing ' + full.length + ' profiles with indexes [' + full.map(p => p.profile_index).join(', ') + '], new index ' + newIdx +
+      ' "' + newName + '" cloned from profile ' + srcIdx + ' "' + (src.name || '') + '"' + (droppedId ? ' (new entry carries no row id of its own)' : ''));
+    const origin = await ensureOriginId();
+    await req('/rest/v1/rpc/sync_push_profiles', { method: 'POST', body: { p_client_max_profiles: full.length, p_origin_client_id: origin, p_profiles: full } });
+    log('clone: profiles list pushed');
+    const sAddons = await pullAddons(srcIdx);
+    const sPlugins = await pullPlugins(srcIdx);
+    const cAddons = sAddons.map(r => { const o = deep(r); delete o.id; o.profile_id = newIdx; return o; });
+    const cPlugins = sPlugins.map(r => { const o = deep(r); delete o.id; o.profile_id = newIdx; return o; });
+    await pushAddonsRpc(newIdx, cAddons);
+    await pushPluginsRpc(newIdx, cPlugins);
+    log('clone: pushed ' + cAddons.length + ' addons and ' + cPlugins.length + ' plugins into profile ' + newIdx);
+    const after = await pullProfiles();
+    S.profiles = after;
+    const found = after.find(p => p.profile_index === newIdx);
+    const vAddons = await pullAddons(newIdx);
+    const vPlugins = await pullPlugins(newIdx);
+    if (found && vAddons.length === cAddons.length && vPlugins.length === cPlugins.length) {
+      log('clone: verify ✅ profile ' + newIdx + ' "' + found.name + '" exists with ' + vAddons.length + ' addons and ' + vPlugins.length + ' plugins, counts match the source');
+    } else {
+      log('clone: verify ❌ profile found: ' + !!found + ', addons ' + vAddons.length + '/' + cAddons.length + ', plugins ' + vPlugins.length + '/' + cPlugins.length + '. Check the account before relying on this clone.');
+    }
+    buildPicker(newIdx);
+    await selectProfile(newIdx);
+    $('cloneName').value = '';
+  } catch (e) {
+    log('error during clone: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ---------- Backup + restore ---------- */
+function downloadJson(name, data) {
+  const text = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  const blob = new Blob([text], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+async function backupLocal(btn) {
+  btn.disabled = true;
+  try {
+    const profiles = await pullProfiles();
+    const out = {
+      exported_at: new Date().toISOString(),
+      note: 'Nuvio addons/plugins backup from the Nuvio Account Manager page (v1 backup format). Provider credentials are NOT included (addons/plugins only).',
+      profiles: []
+    };
     for (const p of profiles) {
       const addons = await pullAddons(p.profile_index);
       const plugins = await pullPlugins(p.profile_index);
-      S.profiles.push({ info: p, addons, plugins });
-      S.originals[p.profile_index] = JSON.parse(JSON.stringify(addons));
-      log('profile ' + p.profile_index + ' "' + (p.name || '') + '": ' + addons.length + ' addons, ' + plugins.length + ' plugins');
-    }
-    render();
-    $('actionCard').classList.remove('hidden');
-    $('loginMsg').innerHTML = '<span class="ok">✅ signed in, scan complete</span>';
-  } catch (e) {
-    $('loginMsg').innerHTML = '<span class="bad">❌ ' + e.message + '</span>';
-    log('error: ' + e.message);
-  } finally {
-    $('scanBtn').disabled = false;
-  }
-}
-
-function render() {
-  let html = '';
-  for (const { info, addons } of S.profiles) {
-    html += '<div class="card"><b>👤 ' + (info.name || 'Profile ' + info.profile_index) + '</b>' +
-      (info.is_primary ? '<span class="tag">primary</span>' : '') +
-      (info.uses_primary_addons ? '<span class="tag">uses primary addons</span>' : '') +
-      '<div class="dim" style="font-size:13px">' + addons.length + ' addons on this profile</div>';
-    const tor = addons.filter(isTorrentio);
-    if (!tor.length) html += '<div style="margin-top:8px">no Torrentio addon here</div>';
-    for (const a of tor) {
-      const cur = getSizefilter(a.url);
-      const state = cur === '40gb'
-        ? '<span class="ok">✅ already capped at 40GB</span>'
-        : '<span>🎯 current cap: <b>' + (cur === null ? 'none, no sizefilter set' : cur) + '</b>, will become <b>40gb</b></span>';
-      html += '<div style="margin-top:10px"><b>' + (a.name || 'Torrentio') + '</b> ' + state +
-        '<div class="mono dim" style="margin-top:4px">' + maskUrl(a.url) + '</div></div>';
-    }
-    html += '</div>';
-  }
-  $('results').innerHTML = html;
-}
-
-async function apply() {
-  $('applyBtn').disabled = true;
-  try {
-    let anyChange = false;
-    for (const { info } of S.profiles) {
-      const idx = info.profile_index;
-      if (info.uses_primary_addons && !info.is_primary) {
-        log('profile ' + idx + ': uses the primary profile\'s addon list, covered there, skipping');
-        continue;
-      }
-      const fresh = await pullAddons(idx);
-      let changed = false;
-      const rewritten = fresh.map(a => {
-        if (isTorrentio(a)) {
-          const nu = withSizefilter(a.url);
-          if (nu && nu !== a.url) { changed = true; return Object.assign({}, a, { url: nu }); }
-        }
-        return a;
+      out.profiles.push({
+        profile_index: p.profile_index, name: p.name,
+        is_primary: p.is_primary, uses_primary_addons: p.uses_primary_addons,
+        addons, plugins
       });
-      if (!changed) { log('profile ' + idx + ': Torrentio already capped (or absent), nothing to push'); continue; }
-      await pushAddons(idx, rewritten);
-      anyChange = true;
-      if (!S.changedProfiles.includes(idx)) S.changedProfiles.push(idx);
-      log('profile ' + idx + ': pushed ' + rewritten.length + ' addons with the Torrentio cap');
-      const check = await pullAddons(idx);
-      const tor = check.filter(isTorrentio);
-      const okAll = tor.length && tor.every(a => getSizefilter(a.url) === '40gb');
-      const countsOk = check.length === rewritten.length;
-      log('profile ' + idx + ': verify pull, ' + check.length + ' addons, Torrentio cap ' +
-        (okAll ? '✅ 40gb confirmed' : '❌ NOT confirmed') + (countsOk ? '' : ' ❌ count changed!'));
-      const mine = S.profiles.find(x => x.info.profile_index === idx);
-      if (mine) mine.addons = check;
     }
-    render();
-    if (S.changedProfiles.length) $('undoBtn').classList.remove('hidden');
-    log(anyChange ? '🎉 done, cap applied and verified above' : 'nothing needed changing');
+    downloadJson('nuvio-backup.json', out);
+    log('backup downloaded: addons + plugins for ' + profiles.length + ' profile(s), pulled fresh just now');
   } catch (e) {
-    log('error during apply: ' + e.message);
-    alert('Apply hit an error: ' + e.message + '\nCheck the log. Your original lists are still held by the Undo button and the backup download.');
+    log('error during backup: ' + e.message);
   } finally {
-    $('applyBtn').disabled = false;
+    btn.disabled = false;
   }
 }
-
-async function undo() {
-  $('undoBtn').disabled = true;
+async function backupServer(btn) {
+  btn.disabled = true;
   try {
-    for (const idx of S.changedProfiles) {
-      await pushAddons(idx, S.originals[idx]);
-      const check = await pullAddons(idx);
-      const mine = S.profiles.find(x => x.info.profile_index === idx);
-      if (mine) mine.addons = check;
-      log('profile ' + idx + ': original list restored (' + check.length + ' addons)');
-    }
-    S.changedProfiles = [];
-    $('undoBtn').classList.add('hidden');
-    render();
-    log('↩️ undo complete');
+    const data = await req('/rest/v1/rpc/sync_export_account_backup', { method: 'POST', body: {} });
+    downloadJson('nuvio-account-backup-full.json', data == null ? {} : data);
+    log('full account backup from the server downloaded (sync_export_account_backup)');
   } catch (e) {
-    log('error during undo: ' + e.message);
+    log('error during server backup: ' + e.message);
   } finally {
-    $('undoBtn').disabled = false;
+    btn.disabled = false;
+  }
+}
+let restoreData = null;
+function onRestoreFile() {
+  restoreData = null;
+  $('restoreBtn').disabled = true;
+  $('restoreInfo').innerHTML = '';
+  const f = $('restoreFile').files && $('restoreFile').files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(String(reader.result || ''));
+      if (!parsed || !Array.isArray(parsed.profiles)) throw new Error('this file has no profiles array, not a v1-format backup');
+      restoreData = parsed;
+      let totalA = 0, totalP = 0;
+      for (const pe of parsed.profiles) {
+        totalA += Array.isArray(pe.addons) ? pe.addons.length : 0;
+        totalP += Array.isArray(pe.plugins) ? pe.plugins.length : 0;
+      }
+      $('restoreInfo').innerHTML = '📄 <b>' + esc(f.name) + '</b>: ' + parsed.profiles.length + ' profile(s), ' + totalA + ' addons, ' + totalP + ' plugins. Restoring overwrites those lists on the account.';
+      $('restoreBtn').disabled = false;
+    } catch (e) {
+      $('restoreInfo').innerHTML = '<span class="bad">❌ could not read this file: ' + esc(e.message) + '</span>';
+    }
+  };
+  reader.readAsText(f);
+}
+async function restore(btn) {
+  if (!restoreData) return;
+  if (!confirm('Restore now? This OVERWRITES the addon and plugin lists of every profile in the file with the file contents. The current server state is saved into Undo first.')) return;
+  btn.disabled = true;
+  try {
+    for (const pe of restoreData.profiles) {
+      const idx = pe.profile_index;
+      for (const kind of ['addons', 'plugins']) {
+        if (!Array.isArray(pe[kind])) continue;
+        try {
+          const cur = await pullSection(idx, kind);
+          S.undo[idx + ':' + kind] = { list: deep(cur), desc: 'state before restore ' + new Date().toLocaleTimeString() };
+          const payload = pe[kind].map((r, i) => { const o = Object.assign({}, r); if (typeof o.sort_order !== 'number') o.sort_order = i; return o; });
+          await pushSectionRpc(idx, kind, payload);
+          const chk = await pullSection(idx, kind);
+          log('restore: profile ' + idx + ' ' + kind + ' ' + chk.length + '/' + payload.length + ' ' + (chk.length === payload.length ? '✅ verified' : '❌ COUNT MISMATCH'));
+          if (S.work[idx]) { S.work[idx][kind] = deep(chk); S.base[idx][kind] = chk.length; delete S.dirty[idx + ':' + kind]; }
+        } catch (e) {
+          log('restore: profile ' + idx + ' ' + kind + ' failed: ' + e.message);
+        }
+      }
+    }
+    if (S.sel != null && S.work[S.sel]) { renderSection('addons'); renderSection('plugins'); }
+    refreshDirtyLabels();
+    refreshUndoButtons();
+    log('restore finished');
+  } finally {
+    btn.disabled = false;
   }
 }
 
-function backup() {
-  const data = {
-    exported_at: new Date().toISOString(),
-    note: 'Nuvio addons/plugins backup from the local Torrentio Fix page. Provider credentials are NOT included (addons/plugins only).',
-    profiles: S.profiles.map(({ info, addons, plugins }) => ({
-      profile_index: info.profile_index, name: info.name,
-      is_primary: info.is_primary, uses_primary_addons: info.uses_primary_addons,
-      addons, plugins
-    }))
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'nuvio-backup.json';
-  a.click();
-  URL.revokeObjectURL(a.href);
-  log('backup downloaded (addons + plugins for ' + S.profiles.length + ' profiles)');
-}
-
-$('scanBtn').addEventListener('click', scan);
-$('applyBtn').addEventListener('click', apply);
-$('backupBtn').addEventListener('click', backup);
-$('undoBtn').addEventListener('click', undo);
+/* ---------- Wiring ---------- */
+$('signInBtn').addEventListener('click', signIn);
+$('profilePicker').addEventListener('change', e => { selectProfile(parseInt(e.target.value, 10)).catch(err => log('error: ' + err.message)); });
+$('reloadProfileBtn').addEventListener('click', reloadProfile);
+$('addAddonBtn').addEventListener('click', () => addRow('addons'));
+$('addPluginBtn').addEventListener('click', () => addRow('plugins'));
+$('pushAddonsBtn').addEventListener('click', e => pushSection('addons', e.currentTarget));
+$('pushPluginsBtn').addEventListener('click', e => pushSection('plugins', e.currentTarget));
+$('undoAddonsBtn').addEventListener('click', e => undoSection('addons', e.currentTarget));
+$('undoPluginsBtn').addEventListener('click', e => undoSection('plugins', e.currentTarget));
+$('cloneBtn').addEventListener('click', e => cloneProfile(e.currentTarget));
+$('backupLocalBtn').addEventListener('click', e => backupLocal(e.currentTarget));
+$('backupServerBtn').addEventListener('click', e => backupServer(e.currentTarget));
+$('restoreFile').addEventListener('change', onRestoreFile);
+$('restoreBtn').addEventListener('click', e => restore(e.currentTarget));
 </script>
 </body>
 </html>
