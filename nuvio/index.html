@@ -30,7 +30,7 @@
 </head>
 <body>
 <h1>🎬 Nuvio Torrentio Fix</h1>
-<div class="sub">Caps Torrentio sources at <b>40GB</b> (<span class="mono">sizefilter=40gb</span>) on your Nuvio account. Everything else in the addon link stays untouched.</div>
+<div class="sub">Caps Torrentio sources at <b>40GB</b> (<span class="mono">sizefilter=40gb</span>) on your Nuvio account. Everything else in the addon link stays untouched. <span class="dim">tool v1.2.0</span></div>
 
 <div class="privacy">🔒 <b>How this page works:</b> it runs entirely in this browser tab and talks <b>only</b> to the official Nuvio API at <span class="mono">api.nuvio.tv</span>, the same API Nuvio's own apps use. Your password goes straight from this tab to Nuvio, it is <b>never stored</b>, and the sign-in token lives only in this tab's memory. Close the tab and everything is gone.</div>
 
@@ -58,7 +58,7 @@
 <script>
 const API = 'https://api.nuvio.tv';
 const PUB = 'sb_publishable_1Clq8rlTVACkdcZuqr6_AD__xUUC_EN';
-const S = { token: null, profiles: [], originals: {}, changedProfiles: [] };
+const S = { token: null, profiles: [], originals: {}, changedProfiles: [], originId: null };
 
 const $ = id => document.getElementById(id);
 function log(msg) {
@@ -135,8 +135,20 @@ async function pullAddons(idx) {
 async function pullPlugins(idx) {
   return await req('/rest/v1/plugins?select=*&profile_id=eq.' + idx + '&order=sort_order.asc');
 }
+async function ensureOriginId() {
+  if (S.originId) return S.originId;
+  let cur = null;
+  try { cur = await req('/rest/v1/rpc/sync_current_origin_client_id', { method: 'POST', body: {} }); } catch (e) { }
+  if (typeof cur === 'string' && cur) { S.originId = cur; log('sync origin client id: using the account\'s existing id'); return S.originId; }
+  const gen = 'nuvio-tool-' + Math.random().toString(36).slice(2, 10);
+  await req('/rest/v1/rpc/sync_set_origin_client_id', { method: 'POST', body: { p_origin_client_id: gen } });
+  S.originId = gen;
+  log('sync origin client id: registered a new one for this tool');
+  return S.originId;
+}
 async function pushAddons(idx, list) {
-  return await req('/rest/v1/rpc/sync_push_addons', { method: 'POST', body: { p_profile_index: idx, p_addons: list } });
+  const origin = await ensureOriginId();
+  return await req('/rest/v1/rpc/sync_push_addons', { method: 'POST', body: { p_profile_id: idx, p_addons: list, p_origin_client_id: origin } });
 }
 
 async function scan() {
