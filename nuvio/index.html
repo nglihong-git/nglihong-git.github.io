@@ -82,13 +82,15 @@ async function req(path, opts = {}) {
 
 /* ---------- Torrentio URL logic (string surgery only, nothing re-encoded) ---------- */
 function splitConfig(url) {
+  if (!url) return null;
   const suffix = '/manifest.json';
-  if (!url || !url.endsWith(suffix)) return null;
-  const head = url.slice(0, -suffix.length);
+  let head = url, hadManifest = false;
+  if (url.endsWith(suffix)) { head = url.slice(0, -suffix.length); hadManifest = true; }
   const pe = head.indexOf('://');
+  if (pe < 0) return null;
   const ps = head.indexOf('/', pe + 3);
-  if (ps < 0) return { base: head, cfg: '' };
-  return { base: head.slice(0, ps), cfg: head.slice(ps + 1) };
+  if (ps < 0) return { base: head, cfg: '', hadManifest };
+  return { base: head.slice(0, ps), cfg: head.slice(ps + 1), hadManifest };
 }
 function getSizefilter(url) {
   const p = splitConfig(url); if (!p || !p.cfg) return null;
@@ -105,7 +107,7 @@ function withSizefilter(url) {
     if (segs[i].toLowerCase().startsWith('sizefilter=')) { segs[i] = 'sizefilter=40gb'; done = true; break; }
   }
   if (!done) segs.push('sizefilter=40gb');
-  return p.base + '/' + segs.join('|') + '/manifest.json';
+  return p.base + '/' + segs.join('|') + (p.hadManifest ? '/manifest.json' : '');
 }
 const KNOWN_KEYS = ['providers','sort','qualityfilter','language','debridoptions','sizefilter','excludequality','resolutions','quality','limit','audio'];
 function maskUrl(url) {
@@ -120,7 +122,7 @@ function maskUrl(url) {
     if (seg.length >= 24) return seg.slice(0, 4) + '••••';
     return seg;
   });
-  return p.base + '/' + segs.join('|') + '/manifest.json';
+  return p.base + '/' + segs.join('|') + (p.hadManifest ? '/manifest.json' : '');
 }
 function isTorrentio(a) {
   return (((a.name || '') + ' ' + (a.url || '')).toLowerCase().includes('torrentio'));
