@@ -46,7 +46,7 @@
 </head>
 <body>
 <h1>🎬 Nuvio Account Manager</h1>
-<div class="sub">Universal tool for your Nuvio account: profiles, addons, plugins, cloning, safe profile deletion, backup and restore, plus Torrentio and Comet presets. Everything runs through the official Nuvio Cloud API. <span class="dim">tool v2.2.0</span></div>
+<div class="sub">Universal tool for your Nuvio account: profiles, addons, plugins, cloning, safe profile deletion, backup and restore, plus Torrentio and Comet presets. Everything runs through the official Nuvio Cloud API. <span class="dim">tool v2.2.1</span></div>
 
 <div class="privacy">🔒 <b>How this page works:</b> it runs entirely in this browser tab and talks <b>only</b> to the official Nuvio API at <span class="mono">api.nuvio.tv</span>, the same API Nuvio's own apps use. Your password goes straight from this tab to Nuvio, it is <b>never stored</b>, and the sign-in token lives only in this tab's memory. Close the tab and everything is gone.</div>
 
@@ -69,10 +69,24 @@
     <div class="btnrow">
       <button id="reloadProfileBtn" class="secondary">↻ Reload this profile</button>
     </div>
+    <div id="reloadConfirmBox" class="hidden" style="margin-top:12px">
+      <div class="warn">⚠️ This profile has <b>unsaved local edits</b>. Reloading throws them away.</div>
+      <div class="btnrow">
+        <button id="reloadYesBtn" class="danger">Yes, discard changes</button>
+        <button id="reloadNoBtn" class="secondary">Cancel</button>
+      </div>
+    </div>
     <div style="border-top:1px solid #2b333d; margin-top:14px; padding-top:2px">
       <label>Danger zone</label>
       <button id="deleteProfileBtn" class="danger" disabled>🗑 Delete this profile</button>
       <div id="deleteProfileNote" class="dim" style="font-size:13px; margin-top:6px"></div>
+      <div id="deleteGate1Box" class="hidden" style="margin-top:12px">
+        <div class="warn" id="deleteGate1Text"></div>
+        <div class="btnrow">
+          <button id="deleteGate1YesBtn" class="danger">Yes, delete</button>
+          <button id="deleteGate1NoBtn" class="secondary">Cancel</button>
+        </div>
+      </div>
       <div id="deleteArmBox" class="hidden" style="margin-top:12px">
         <div class="warn" id="deleteWarnText"></div>
         <label for="deleteConfirmInput">Type the profile name exactly to arm the delete button</label>
@@ -135,6 +149,13 @@
     <input id="restoreFile" type="file" accept="application/json,.json">
     <div id="restoreInfo" style="margin-top:8px; font-size:14px"></div>
     <button id="restoreBtn" class="danger" disabled>⚠️ Restore from this file</button>
+    <div id="restoreConfirmBox" class="hidden" style="margin-top:12px">
+      <div class="warn">⚠️ <b>Restore now?</b> This overwrites the addon and plugin lists of every profile in the file with the file contents. The current server state is saved into Undo first.</div>
+      <div class="btnrow">
+        <button id="restoreYesBtn" class="danger">Yes, restore</button>
+        <button id="restoreNoBtn" class="secondary">Cancel</button>
+      </div>
+    </div>
     <div class="warn" style="margin-top:12px">⚠️ Restore <b>overwrites</b> the addon and plugin lists of every profile in the backup file with the file's contents (complete lists, full replace), then verifies each one by pulling it back. The server state as it was right before the restore is saved into Undo first, so a restore can be rolled back per profile and section.</div>
   </div>
 </div>
@@ -293,6 +314,51 @@ function deleteNameMatches(typed, p) {
 }
 /* ---------- end Delete profile logic ---------- */
 
+/* ---------- Inline confirmation gates ---------- */
+/* No native browser dialogs anywhere in this page: they silently break under
+   automation (an automated click gets them dismissed as a cancel, so the guarded
+   action never starts). Every confirmation is an inline in-page cluster instead:
+   the control swaps in place for an "Are you sure?" box with an affirmative and a
+   Cancel button. This block is the pure state core (registry + gate show/hide);
+   the DOM wiring lives at the bottom of the script. */
+function createGateRegistry() {
+  const armed = {};
+  return {
+    arm: function (k) { armed[k] = true; },
+    disarm: function (k) { delete armed[k]; },
+    disarmAll: function () { for (const k in armed) delete armed[k]; },
+    isArmed: function (k) { return armed[k] === true; }
+  };
+}
+const gates = createGateRegistry();
+const inlineDisarmers = new Set();
+function disarmAllInline() {
+  for (const f of Array.from(inlineDisarmers)) { try { f(); } catch (e) { } }
+  gates.disarmAll();
+}
+function makeInlineGate(key, box, trigger) {
+  let prevDisabled = false;
+  const g = {
+    show: function () {
+      if (gates.isArmed(key)) return;
+      gates.arm(key);
+      prevDisabled = trigger ? !!trigger.disabled : false;
+      if (trigger) trigger.disabled = true;
+      if (box) box.classList.remove('hidden');
+    },
+    hide: function () {
+      const wasArmed = gates.isArmed(key);
+      if (wasArmed) gates.disarm(key);
+      if (box) box.classList.add('hidden');
+      if (wasArmed && trigger) trigger.disabled = prevDisabled;
+    },
+    isArmed: function () { return gates.isArmed(key); }
+  };
+  inlineDisarmers.add(g.hide);
+  return g;
+}
+/* ---------- end Inline confirmation gates ---------- */
+
 const S = {
   token: null, originId: null,
   profiles: [],   // profile objects exactly as pulled
@@ -396,14 +462,13 @@ async function selectProfile(idx) {
   renderSection('plugins');
   refreshDirtyLabels();
   refreshUndoButtons();
+  disarmAllInline();
   refreshDeleteUi();
 }
 async function reloadProfile() {
   const idx = S.sel;
   if (idx == null) return;
-  if (S.dirty[idx + ':addons'] || S.dirty[idx + ':plugins']) {
-    if (!confirm('This profile has unsaved local edits. Reloading throws them away. Reload anyway?')) return;
-  }
+  disarmAllInline();
   try {
     await loadProfileData(idx);
     renderSection('addons');
@@ -445,7 +510,10 @@ function renderSection(kind) {
       '<span class="spacer"></span>' +
       '<button class="small secondary" data-act="up">↑</button>' +
       '<button class="small secondary" data-act="down">↓</button>' +
-      '<button class="small danger" data-act="del">🗑</button></div>';
+      '<button class="small danger" data-act="del">🗑</button></div>' +
+      '<div class="warn hidden" data-cfbox style="margin-top:8px"><span data-cfmsg></span>' +
+      '<div class="btnrow"><button class="small danger" data-cf="yes">Yes, remove</button>' +
+      '<button class="small secondary" data-cf="no">Cancel</button></div></div>';
     h += '<label>name</label><input type="text" data-f="name" value="' + esc(row.name || '') + '">';
     h += '<label>url</label><input type="text" data-f="url" value="' + esc(row.url || '') + '">';
     if (kind === 'addons' && isTorrentio(row)) {
@@ -494,11 +562,21 @@ function wireRow(kind, rowEl, i) {
     const t = list[i + 1]; list[i + 1] = list[i]; list[i] = t;
     markDirty(kind); renderSection(kind);
   });
-  rowEl.querySelector('[data-act="del"]').addEventListener('click', () => {
-    if (!confirm('Remove "' + (row.name || row.url || 'this row') + '" from the local list? It only disappears on the server when you push.')) return;
+  const delBtn = rowEl.querySelector('[data-act="del"]');
+  const cfBox = rowEl.querySelector('[data-cfbox]');
+  delBtn.addEventListener('click', () => {
+    cfBox.querySelector('[data-cfmsg]').textContent = 'Remove "' + (row.name || row.url || 'this row') + '" from the local list? It only disappears on the server when you push.';
+    cfBox.classList.remove('hidden');
+    delBtn.disabled = true;
+  });
+  cfBox.querySelector('[data-cf="yes"]').addEventListener('click', () => {
     list.splice(i, 1);
     markDirty(kind); renderSection(kind);
     log(kind + ': removed a row locally (' + list.length + ' left), not pushed yet');
+  });
+  cfBox.querySelector('[data-cf="no"]').addEventListener('click', () => {
+    cfBox.classList.add('hidden');
+    delBtn.disabled = false;
   });
   const setBtn = rowEl.querySelector('[data-act="setcap"]');
   if (setBtn) setBtn.addEventListener('click', () => {
@@ -674,7 +752,13 @@ function startDeleteProfile() {
   const p = S.profiles.find(x => x.profile_index === S.sel) || null;
   const g = profileDeleteGuard(p, S.profiles.length);
   if (!g.ok) { log('delete: refused, ' + g.reason); return; }
-  if (!confirm('Delete profile "' + (p.name || '') + '" (#' + p.profile_index + ')?\n\nIts addons, plugins, settings and data will be deleted from your Nuvio account. This cannot be undone, except by restoring from a backup.')) return;
+  $('deleteGate1Text').innerHTML = '⚠️ Delete profile <b>"' + esc(p.name || '') + '"</b> (#' + p.profile_index + ')?<br><br>Its addons, plugins, settings and data will be deleted from your Nuvio account. This cannot be undone, except by restoring from a backup.';
+  deleteGate1.show();
+}
+function proceedDeleteProfile() {
+  const p = S.profiles.find(x => x.profile_index === S.sel) || null;
+  const g = profileDeleteGuard(p, S.profiles.length);
+  if (!g.ok) { log('delete: refused, ' + g.reason); return; }
   pendingDeleteIdx = p.profile_index;
   $('deleteWarnText').innerHTML = '⚠️ <b>Final step.</b> You are about to permanently delete profile <b>"' + esc(p.name || '') + '"</b> (#' + p.profile_index + '). Its addons, plugins, settings and data are deleted first, then the profile entry itself. Type <b>"' + esc(deleteExpectedText(p)) + '"</b> exactly below to arm the delete button.';
   $('deleteConfirmInput').value = '';
@@ -813,6 +897,7 @@ async function backupServer(btn) {
 }
 let restoreData = null;
 function onRestoreFile() {
+  restoreGate.hide();
   restoreData = null;
   $('restoreBtn').disabled = true;
   $('restoreInfo').innerHTML = '';
@@ -839,7 +924,6 @@ function onRestoreFile() {
 }
 async function restore(btn) {
   if (!restoreData) return;
-  if (!confirm('Restore now? This OVERWRITES the addon and plugin lists of every profile in the file with the file contents. The current server state is saved into Undo first.')) return;
   btn.disabled = true;
   try {
     for (const pe of restoreData.profiles) {
@@ -871,7 +955,15 @@ async function restore(btn) {
 /* ---------- Wiring ---------- */
 $('signInBtn').addEventListener('click', signIn);
 $('profilePicker').addEventListener('change', e => { selectProfile(parseInt(e.target.value, 10)).catch(err => log('error: ' + err.message)); });
-$('reloadProfileBtn').addEventListener('click', reloadProfile);
+const reloadGate = makeInlineGate('reload', $('reloadConfirmBox'), $('reloadProfileBtn'));
+$('reloadProfileBtn').addEventListener('click', () => {
+  const idx = S.sel;
+  if (idx == null) return;
+  if (S.dirty[idx + ':addons'] || S.dirty[idx + ':plugins']) { reloadGate.show(); return; }
+  reloadProfile();
+});
+$('reloadYesBtn').addEventListener('click', () => { reloadGate.hide(); reloadProfile(); });
+$('reloadNoBtn').addEventListener('click', () => reloadGate.hide());
 $('addAddonBtn').addEventListener('click', () => addRow('addons'));
 $('addPluginBtn').addEventListener('click', () => addRow('plugins'));
 $('pushAddonsBtn').addEventListener('click', e => pushSection('addons', e.currentTarget));
@@ -879,14 +971,20 @@ $('pushPluginsBtn').addEventListener('click', e => pushSection('plugins', e.curr
 $('undoAddonsBtn').addEventListener('click', e => undoSection('addons', e.currentTarget));
 $('undoPluginsBtn').addEventListener('click', e => undoSection('plugins', e.currentTarget));
 $('cloneBtn').addEventListener('click', e => cloneProfile(e.currentTarget));
+const deleteGate1 = makeInlineGate('delete1', $('deleteGate1Box'), $('deleteProfileBtn'));
 $('deleteProfileBtn').addEventListener('click', startDeleteProfile);
+$('deleteGate1YesBtn').addEventListener('click', () => { deleteGate1.hide(); proceedDeleteProfile(); });
+$('deleteGate1NoBtn').addEventListener('click', () => deleteGate1.hide());
 $('deleteConfirmInput').addEventListener('input', onDeleteConfirmInput);
 $('deleteConfirmBtn').addEventListener('click', e => deleteProfile(e.currentTarget));
 $('deleteCancelBtn').addEventListener('click', cancelDeleteProfile);
 $('backupLocalBtn').addEventListener('click', e => backupLocal(e.currentTarget));
 $('backupServerBtn').addEventListener('click', e => backupServer(e.currentTarget));
 $('restoreFile').addEventListener('change', onRestoreFile);
-$('restoreBtn').addEventListener('click', e => restore(e.currentTarget));
+const restoreGate = makeInlineGate('restore', $('restoreConfirmBox'), $('restoreBtn'));
+$('restoreBtn').addEventListener('click', () => { if (restoreData) restoreGate.show(); });
+$('restoreYesBtn').addEventListener('click', () => { restoreGate.hide(); restore($('restoreBtn')); });
+$('restoreNoBtn').addEventListener('click', () => restoreGate.hide());
 </script>
 </body>
 </html>
