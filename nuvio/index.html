@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nuvio Torrentio Fix · local page</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: -apple-system, system-ui, sans-serif; background:#0d1117; color:#e6edf3;
+         margin:0; padding:18px; max-width:720px; margin-inline:auto; line-height:1.45; }
+  h1 { font-size:22px; margin:4px 0 2px; }
+  .sub { color:#9da7b1; font-size:14px; margin-bottom:16px; }
+  .card { background:#151b23; border:1px solid #2b333d; border-radius:12px; padding:14px; margin:12px 0; }
+  label { display:block; font-size:13px; color:#9da7b1; margin:10px 0 4px; }
+  input { width:100%; box-sizing:border-box; padding:12px; border-radius:9px; border:1px solid #2b333d;
+          background:#0d1117; color:#e6edf3; font-size:16px; }
+  button { width:100%; padding:13px; border-radius:9px; border:0; font-size:16px; font-weight:600;
+           background:#1f6feb; color:#fff; margin-top:14px; }
+  button.secondary { background:#22303f; }
+  button:disabled { opacity:.45; }
+  .privacy { background:#12281a; border:1px solid #1d4d2e; border-radius:12px; padding:12px 14px; font-size:14px; }
+  .warn { background:#2b2110; border:1px solid #6b5316; border-radius:12px; padding:12px 14px; font-size:14px; }
+  .mono { font-family: ui-monospace, monospace; font-size:12px; word-break: break-all; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; background:#22303f; margin-left:6px; }
+  .ok { color:#3fb950; } .bad { color:#f85149; } .dim { color:#9da7b1; }
+  #log { white-space:pre-wrap; font-family:ui-monospace, monospace; font-size:12.5px; background:#0a0e13;
+         border:1px solid #2b333d; border-radius:10px; padding:10px; min-height:60px; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<h1>🎬 Nuvio Torrentio Fix</h1>
+<div class="sub">Caps Torrentio sources at <b>40GB</b> (<span class="mono">sizefilter=40gb</span>) on your Nuvio account. Everything else in the addon link stays untouched.</div>
+
+<div class="privacy">🔒 <b>How this page works:</b> it runs entirely in this browser tab and talks <b>only</b> to the official Nuvio API at <span class="mono">api.nuvio.tv</span>, the same API Nuvio's own apps use. Your password goes straight from this tab to Nuvio, it is <b>never stored</b>, and the sign-in token lives only in this tab's memory. Close the tab and everything is gone.</div>
+
+<div class="card" id="loginCard">
+  <label for="email">Nuvio email</label>
+  <input id="email" type="email" autocomplete="username" placeholder="you@example.com">
+  <label for="password">Nuvio password</label>
+  <input id="password" type="password" autocomplete="current-password" placeholder="••••••••">
+  <button id="scanBtn">Sign in &amp; scan my account</button>
+  <div id="loginMsg" style="margin-top:10px"></div>
+</div>
+
+<div id="results"></div>
+
+<div class="card hidden" id="actionCard">
+  <button id="applyBtn">✅ Apply the 40GB cap</button>
+  <button id="backupBtn" class="secondary">⬇️ Download backup of my addons (JSON)</button>
+  <button id="undoBtn" class="secondary hidden">↩️ Undo (restore the lists I pulled at scan time)</button>
+  <div class="warn" style="margin-top:12px">⚠️ Apply re-saves each changed profile's <b>complete</b> addon list with only the Torrentio link rewritten. Nothing else is pushed. After pushing, the page pulls your list again and verifies the cap is really there.</div>
+</div>
+
+<h3>Log</h3>
+<div id="log">waiting…</div>
+
+<script>
+const API = 'https://api.nuvio.tv';
+const PUB = 'sb_publishable_1Clq8rlTVACkdcZuqr6_AD__xUUC_EN';
+const S = { token: null, profiles: [], originals: {}, changedProfiles: [] };
+
+const $ = id => document.getElementById(id);
+function log(msg) {
+  const t = new Date().toLocaleTimeString();
+  $('log').textContent += ($('log').textContent === 'waiting…' ? '' : '\n') + '[' + t + '] ' + msg;
+  $('log').scrollTop = 1e6;
+}
+
+async function req(path, opts = {}) {
+  const { method = 'GET', body = null, auth = true } = opts;
+  const headers = { 'apikey': PUB, 'Content-Type': 'application/json' };
+  headers['Authorization'] = 'Bearer ' + (auth && S.token ? S.token : PUB);
+  const r = await fetch(API + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  let j = null; try { j = await r.json(); } catch (e) { }
+  if (!r.ok) {
+    const m = (j && (j.message || j.msg || j.error_description || j.error)) || ('HTTP ' + r.status);
+    throw new Error(m);
+  }
+  return j;
+}
+
+/* ---------- Torrentio URL logic (string surgery only, nothing re-encoded) ---------- */
+function splitConfig(url) {
+  const suffix = '/manifest.json';
+  if (!url || !url.endsWith(suffix)) return null;
+  const head = url.slice(0, -suffix.length);
+  const pe = head.indexOf('://');
+  const ps = head.indexOf('/', pe + 3);
+  if (ps < 0) return { base: head, cfg: '' };
+  return { base: head.slice(0, ps), cfg: head.slice(ps + 1) };
+}
+function getSizefilter(url) {
+  const p = splitConfig(url); if (!p || !p.cfg) return null;
+  for (const seg of p.cfg.split('|')) {
+    if (seg.toLowerCase().startsWith('sizefilter=')) return seg.slice('sizefilter='.length);
+  }
+  return null;
+}
+function withSizefilter(url) {
+  const p = splitConfig(url); if (!p) return null;
+  const segs = p.cfg ? p.cfg.split('|') : [];
+  let done = false;
+  for (let i = 0; i < segs.length; i++) {
+    if (segs[i].toLowerCase().startsWith('sizefilter=')) { segs[i] = 'sizefilter=40gb'; done = true; break; }
+  }
+  if (!done) segs.push('sizefilter=40gb');
+  return p.base + '/' + segs.join('|') + '/manifest.json';
+}
+const KNOWN_KEYS = ['providers','sort','qualityfilter','language','debridoptions','sizefilter','excludequality','resolutions','quality','limit','audio'];
+function maskUrl(url) {
+  const p = splitConfig(url); if (!p || !p.cfg) return url;
+  const segs = p.cfg.split('|').map(seg => {
+    const eq = seg.indexOf('=');
+    if (eq > 0) {
+      const k = seg.slice(0, eq), v = seg.slice(eq + 1);
+      if (!KNOWN_KEYS.includes(k.toLowerCase()) && v.length > 6) return k + '=' + v.slice(0, 4) + '••••';
+      return seg;
+    }
+    if (seg.length >= 24) return seg.slice(0, 4) + '••••';
+    return seg;
+  });
+  return p.base + '/' + segs.join('|') + '/manifest.json';
+}
+function isTorrentio(a) {
+  return (((a.name || '') + ' ' + (a.url || '')).toLowerCase().includes('torrentio'));
+}
+
+/* ---------- Account operations ---------- */
+async function pullAddons(idx) {
+  return await req('/rest/v1/addons?select=*&profile_id=eq.' + idx + '&order=sort_order.asc');
+}
+async function pullPlugins(idx) {
+  return await req('/rest/v1/plugins?select=*&profile_id=eq.' + idx + '&order=sort_order.asc');
+}
+async function pushAddons(idx, list) {
+  return await req('/rest/v1/rpc/sync_push_addons', { method: 'POST', body: { p_profile_index: idx, p_addons: list } });
+}
+
+async function scan() {
+  $('scanBtn').disabled = true;
+  $('loginMsg').innerHTML = '';
+  try {
+    const email = $('email').value.trim();
+    const password = $('password').value;
+    if (!email || !password) throw new Error('enter your Nuvio email and password first');
+    log('signing in to api.nuvio.tv…');
+    const sess = await req('/auth/v1/token?grant_type=password', { method: 'POST', auth: false, body: { email, password } });
+    S.token = sess.access_token;
+    $('password').value = '';
+    const user = await req('/auth/v1/user');
+    log('signed in as ' + (user.email || email));
+    const profiles = await req('/rest/v1/rpc/sync_pull_profiles', { method: 'POST', body: {} });
+    if (!Array.isArray(profiles) || !profiles.length) throw new Error('no profiles came back');
+    S.profiles = []; S.originals = {}; S.changedProfiles = [];
+    for (const p of profiles) {
+      const addons = await pullAddons(p.profile_index);
+      const plugins = await pullPlugins(p.profile_index);
+      S.profiles.push({ info: p, addons, plugins });
+      S.originals[p.profile_index] = JSON.parse(JSON.stringify(addons));
+      log('profile ' + p.profile_index + ' "' + (p.name || '') + '": ' + addons.length + ' addons, ' + plugins.length + ' plugins');
+    }
+    render();
+    $('actionCard').classList.remove('hidden');
+    $('loginMsg').innerHTML = '<span class="ok">✅ signed in, scan complete</span>';
+  } catch (e) {
+    $('loginMsg').innerHTML = '<span class="bad">❌ ' + e.message + '</span>';
+    log('error: ' + e.message);
+  } finally {
+    $('scanBtn').disabled = false;
+  }
+}
+
+function render() {
+  let html = '';
+  for (const { info, addons } of S.profiles) {
+    html += '<div class="card"><b>👤 ' + (info.name || 'Profile ' + info.profile_index) + '</b>' +
+      (info.is_primary ? '<span class="tag">primary</span>' : '') +
+      (info.uses_primary_addons ? '<span class="tag">uses primary addons</span>' : '') +
+      '<div class="dim" style="font-size:13px">' + addons.length + ' addons on this profile</div>';
+    const tor = addons.filter(isTorrentio);
+    if (!tor.length) html += '<div style="margin-top:8px">no Torrentio addon here</div>';
+    for (const a of tor) {
+      const cur = getSizefilter(a.url);
+      const state = cur === '40gb'
+        ? '<span class="ok">✅ already capped at 40GB</span>'
+        : '<span>🎯 current cap: <b>' + (cur === null ? 'none, no sizefilter set' : cur) + '</b>, will become <b>40gb</b></span>';
+      html += '<div style="margin-top:10px"><b>' + (a.name || 'Torrentio') + '</b> ' + state +
+        '<div class="mono dim" style="margin-top:4px">' + maskUrl(a.url) + '</div></div>';
+    }
+    html += '</div>';
+  }
+  $('results').innerHTML = html;
+}
+
+async function apply() {
+  $('applyBtn').disabled = true;
+  try {
+    let anyChange = false;
+    for (const { info } of S.profiles) {
+      const idx = info.profile_index;
+      if (info.uses_primary_addons && !info.is_primary) {
+        log('profile ' + idx + ': uses the primary profile\'s addon list, covered there, skipping');
+        continue;
+      }
+      const fresh = await pullAddons(idx);
+      let changed = false;
+      const rewritten = fresh.map(a => {
+        if (isTorrentio(a)) {
+          const nu = withSizefilter(a.url);
+          if (nu && nu !== a.url) { changed = true; return Object.assign({}, a, { url: nu }); }
+        }
+        return a;
+      });
+      if (!changed) { log('profile ' + idx + ': Torrentio already capped (or absent), nothing to push'); continue; }
+      await pushAddons(idx, rewritten);
+      anyChange = true;
+      if (!S.changedProfiles.includes(idx)) S.changedProfiles.push(idx);
+      log('profile ' + idx + ': pushed ' + rewritten.length + ' addons with the Torrentio cap');
+      const check = await pullAddons(idx);
+      const tor = check.filter(isTorrentio);
+      const okAll = tor.length && tor.every(a => getSizefilter(a.url) === '40gb');
+      const countsOk = check.length === rewritten.length;
+      log('profile ' + idx + ': verify pull, ' + check.length + ' addons, Torrentio cap ' +
+        (okAll ? '✅ 40gb confirmed' : '❌ NOT confirmed') + (countsOk ? '' : ' ❌ count changed!'));
+      const mine = S.profiles.find(x => x.info.profile_index === idx);
+      if (mine) mine.addons = check;
+    }
+    render();
+    if (S.changedProfiles.length) $('undoBtn').classList.remove('hidden');
+    log(anyChange ? '🎉 done, cap applied and verified above' : 'nothing needed changing');
+  } catch (e) {
+    log('error during apply: ' + e.message);
+    alert('Apply hit an error: ' + e.message + '\nCheck the log. Your original lists are still held by the Undo button and the backup download.');
+  } finally {
+    $('applyBtn').disabled = false;
+  }
+}
+
+async function undo() {
+  $('undoBtn').disabled = true;
+  try {
+    for (const idx of S.changedProfiles) {
+      await pushAddons(idx, S.originals[idx]);
+      const check = await pullAddons(idx);
+      const mine = S.profiles.find(x => x.info.profile_index === idx);
+      if (mine) mine.addons = check;
+      log('profile ' + idx + ': original list restored (' + check.length + ' addons)');
+    }
+    S.changedProfiles = [];
+    $('undoBtn').classList.add('hidden');
+    render();
+    log('↩️ undo complete');
+  } catch (e) {
+    log('error during undo: ' + e.message);
+  } finally {
+    $('undoBtn').disabled = false;
+  }
+}
+
+function backup() {
+  const data = {
+    exported_at: new Date().toISOString(),
+    note: 'Nuvio addons/plugins backup from the local Torrentio Fix page. Provider credentials are NOT included (addons/plugins only).',
+    profiles: S.profiles.map(({ info, addons, plugins }) => ({
+      profile_index: info.profile_index, name: info.name,
+      is_primary: info.is_primary, uses_primary_addons: info.uses_primary_addons,
+      addons, plugins
+    }))
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'nuvio-backup.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  log('backup downloaded (addons + plugins for ' + S.profiles.length + ' profiles)');
+}
+
+$('scanBtn').addEventListener('click', scan);
+$('applyBtn').addEventListener('click', apply);
+$('backupBtn').addEventListener('click', backup);
+$('undoBtn').addEventListener('click', undo);
+</script>
+</body>
+</html>
