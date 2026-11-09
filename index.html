@@ -2,11 +2,147 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>NG Hub</title>
+<title>nglihong-git | GitHub Pages Hub</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Navigation hub for Lihong Ng GitHub Pages tools, project sites, and reserved Tesla Fleet API infrastructure.">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b1020;
+    --panel: #121a2e;
+    --panel-2: #16213a;
+    --text: #eef3ff;
+    --muted: #a9b6d3;
+    --line: #26365e;
+    --accent: #7dd3fc;
+    --accent-2: #a78bfa;
+    --green: #34d399;
+    --amber: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: ui-sans-system, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background:
+      radial-gradient(circle at top left, rgba(125, 211, 252, 0.20), transparent 34rem),
+      radial-gradient(circle at top right, rgba(167, 139, 250, 0.16), transparent 30rem),
+      var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+  }
+  main { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 48px 0 56px; }
+  header { padding: 28px 0 18px; }
+  .eyebrow { color: var(--accent); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.78rem; }
+  h1 { font-size: clamp(2.2rem, 6vw, 4.4rem); line-height: 0.98; margin: 12px 0 16px; max-width: 780px; }
+  .intro { color: var(--muted); max-width: 790px; font-size: 1.08rem; margin: 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 22px; }
+  section { margin-top: 34px; }
+  h2 { font-size: 1.35rem; margin: 0 0 6px; }
+  .section-note { color: var(--muted); margin: 0; max-width: 760px; }
+  .card {
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 3px 9px; font-size: 0.78rem; font-weight: 700; color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .badge.live { color: var(--green); }
+  .badge.protected { color: var(--amber); }
+  .card h3 { margin: 0 0 8px; font-size: 1.22rem; }
+  .card p { color: var(--muted); margin: 0 0 14px; }
+  .meta { font-size: 0.9rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; margin-top: 14px; }
+  .links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+  a.button, a.link {
+    color: var(--text); text-decoration: none; border: 1px solid var(--line);
+    border-radius: 999px; padding: 8px 13px; font-weight: 700; background: rgba(255,255,255,0.04);
+  }
+  a.button { background: var(--accent); color: #082f49; border-color: transparent; }
+  a:hover { filter: brightness(1.1); }
+  code { color: var(--accent); background: rgba(125, 211, 252, 0.10); padding: 0.1rem 0.3rem; border-radius: 6px; }
+  .rules { display: grid; gap: 10px; margin-top: 16px; }
+  .rule { border: 1px solid var(--line); border-radius: 14px; padding: 13px 15px; background: rgba(255,255,255,0.03); color: var(--muted); }
+  .rule strong { color: var(--text); }
+  footer { color: var(--muted); border-top: 1px solid var(--line); margin-top: 38px; padding-top: 18px; font-size: 0.92rem; }
+</style>
 </head>
 <body>
-<h1>NG Hub</h1>
-<p>Personal automation for my own Tesla vehicle. This site hosts the public key used by my Tesla Fleet API application.</p>
+<main>
+  <header>
+    <div class="eyebrow">nglihong-git.github.io</div>
+    <h1>My GitHub Pages front door</h1>
+    <p class="intro">This user site is the navigation hub for my public tools and project sites. Standalone tools should live in their own repositories and project sites. The root also carries reserved Tesla Fleet API infrastructure that has to stay at the domain root.</p>
+  </header>
+
+  <section aria-labelledby="live-sites">
+    <h2 id="live-sites">Live tools and sites</h2>
+    <p class="section-note">Public destinations that are available now. New project sites will be added here when they ship.</p>
+    <div class="grid">
+      <article class="card">
+        <div class="badge live">● Live tool</div>
+        <h3>Nuvio Account Tool</h3>
+        <p>Browser tool for viewing and updating Nuvio addon configuration through the Nuvio API. The current build includes the verified Torrentio 40 GB size cap fix.</p>
+        <div class="links"><a class="button" href="/nuvio/">Open Nuvio tool</a></div>
+        <div class="meta">Path: <code>/nuvio/</code> · Version: <code>v1.2.0</code> · Hosted in this user site for now</div>
+      </article>
+
+      <article class="card">
+        <div class="badge">Project site pattern</div>
+        <h3>Future project sites</h3>
+        <p>Each future standalone tool gets its own repository and its own GitHub Pages project site at <code>nglihong-git.github.io/repo-name/</code>. This root page stays a directory, not a dumping ground.</p>
+        <div class="links"><a class="link" href="https://github.com/nglihong-git">GitHub profile</a></div>
+        <div class="meta">Rule: one tool, one repo, one project site, one link from here.</div>
+      </article>
+    </div>
+  </section>
+
+  <section aria-labelledby="reserved-root">
+    <h2 id="reserved-root">Reserved root infrastructure</h2>
+    <p class="section-note">These root paths are not ordinary pages. They are pinned by external systems and should not be moved, renamed, or deleted.</p>
+    <div class="grid">
+      <article class="card">
+        <div class="badge protected">Protected</div>
+        <h3>Tesla NG Hub</h3>
+        <p>Tesla Fleet API requires the NG Hub public key at the root <code>.well-known</code> path for this domain. The key stays in this user site repo even though the homepage is now a navigation hub.</p>
+        <div class="links">
+          <a class="link" href="/.well-known/appspecific/com.tesla.3p.public-key.pem">Public key</a>
+          <a class="link" href="/callback.html">OAuth callback</a>
+          <a class="link" href="https://github.com/nglihong-git/nglihong-git.github.io">Repository</a>
+        </div>
+        <div class="meta">Reserved paths: <code>/.well-known/appspecific/com.tesla.3p.public-key.pem</code>, <code>/callback.html</code>, <code>/.nojekyll</code></div>
+      </article>
+    </div>
+  </section>
+
+  <section aria-labelledby="repos">
+    <h2 id="repos">Code repositories</h2>
+    <p class="section-note">Repositories that matter to the projects above. Private links may require GitHub sign in.</p>
+    <div class="grid">
+      <article class="card">
+        <div class="badge">Private repo</div>
+        <h3>Tesla Preconditioning Automation</h3>
+        <p>Anonymized snapshot of the personal Tesla preconditioning automation for BabyShark. This is a code repository, not a public Pages site.</p>
+        <div class="links"><a class="link" href="https://github.com/nglihong-git/tesla-preconditioning-automation">Open repository</a></div>
+        <div class="meta">Repo: <code>tesla-preconditioning-automation</code></div>
+      </article>
+    </div>
+  </section>
+
+  <section aria-labelledby="root-rules">
+    <h2 id="root-rules">Root rules</h2>
+    <div class="rules">
+      <div class="rule"><strong>Navigation first:</strong> the root homepage is a directory for present and future Pages projects.</div>
+      <div class="rule"><strong>Project isolation:</strong> new standalone tools go in their own repo and project Pages site whenever possible.</div>
+      <div class="rule"><strong>Tesla exception:</strong> the NG Hub public key and callback stay at the root because Tesla registered this exact domain and fixed key path.</div>
+    </div>
+  </section>
+
+  <footer>Last updated November 8, 2026 · Maintained by Lihong Ng · Static GitHub Pages site</footer>
+</main>
 </body>
 </html>
