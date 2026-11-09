@@ -46,7 +46,7 @@
 </head>
 <body>
 <h1>🎬 Nuvio Account Manager</h1>
-<div class="sub">Universal tool for your Nuvio account: profiles, addons, plugins, cloning, backup and restore, plus Torrentio and Comet presets. Everything runs through the official Nuvio Cloud API. <span class="dim">tool v2.1.0</span></div>
+<div class="sub">Universal tool for your Nuvio account: profiles, addons, plugins, cloning, safe profile deletion, backup and restore, plus Torrentio and Comet presets. Everything runs through the official Nuvio Cloud API. <span class="dim">tool v2.2.0</span></div>
 
 <div class="privacy">🔒 <b>How this page works:</b> it runs entirely in this browser tab and talks <b>only</b> to the official Nuvio API at <span class="mono">api.nuvio.tv</span>, the same API Nuvio's own apps use. Your password goes straight from this tab to Nuvio, it is <b>never stored</b>, and the sign-in token lives only in this tab's memory. Close the tab and everything is gone.</div>
 
@@ -68,6 +68,20 @@
     <div id="profileMeta" style="margin-top:8px; font-size:14px"></div>
     <div class="btnrow">
       <button id="reloadProfileBtn" class="secondary">↻ Reload this profile</button>
+    </div>
+    <div style="border-top:1px solid #2b333d; margin-top:14px; padding-top:2px">
+      <label>Danger zone</label>
+      <button id="deleteProfileBtn" class="danger" disabled>🗑 Delete this profile</button>
+      <div id="deleteProfileNote" class="dim" style="font-size:13px; margin-top:6px"></div>
+      <div id="deleteArmBox" class="hidden" style="margin-top:12px">
+        <div class="warn" id="deleteWarnText"></div>
+        <label for="deleteConfirmInput">Type the profile name exactly to arm the delete button</label>
+        <input id="deleteConfirmInput" type="text" autocomplete="off" placeholder="profile name, exactly as shown">
+        <div class="btnrow">
+          <button id="deleteConfirmBtn" class="danger" disabled>🗑 Permanently delete this profile</button>
+          <button id="deleteCancelBtn" class="secondary">Cancel</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -259,6 +273,26 @@ function fmtGB(bytes) {
 }
 /* ---------- end Comet config logic ---------- */
 
+/* ---------- Delete profile logic (pure helpers, no DOM, no network) ---------- */
+function profileDeleteGuard(p, totalCount) {
+  if (!p) return { ok: false, reason: 'no profile is selected' };
+  if (p.profile_index === 1) return { ok: false, reason: 'profile #1 can never be deleted from this tool' };
+  if (p.is_primary) return { ok: false, reason: 'the primary profile can never be deleted from this tool' };
+  if (typeof totalCount === 'number' && totalCount <= 1) return { ok: false, reason: 'this is the only profile on the account' };
+  return { ok: true };
+}
+function profilesWithout(profiles, idx) {
+  return profiles.filter(p => p.profile_index !== idx);
+}
+function deleteExpectedText(p) {
+  if (p && typeof p.name === 'string' && p.name.length > 0) return p.name;
+  return 'Profile ' + (p ? p.profile_index : '?');
+}
+function deleteNameMatches(typed, p) {
+  return typeof typed === 'string' && typed.length > 0 && typed === deleteExpectedText(p);
+}
+/* ---------- end Delete profile logic ---------- */
+
 const S = {
   token: null, originId: null,
   profiles: [],   // profile objects exactly as pulled
@@ -362,6 +396,7 @@ async function selectProfile(idx) {
   renderSection('plugins');
   refreshDirtyLabels();
   refreshUndoButtons();
+  refreshDeleteUi();
 }
 async function reloadProfile() {
   const idx = S.sel;
@@ -614,6 +649,120 @@ async function cloneProfile(btn) {
   }
 }
 
+/* ---------- Delete profile (two gates, then delete data, then remove the entry, then verify) ---------- */
+let pendingDeleteIdx = null;
+function refreshDeleteUi() {
+  pendingDeleteIdx = null;
+  $('deleteArmBox').classList.add('hidden');
+  $('deleteConfirmInput').value = '';
+  $('deleteConfirmBtn').disabled = true;
+  const btn = $('deleteProfileBtn');
+  const note = $('deleteProfileNote');
+  const p = S.profiles.find(x => x.profile_index === S.sel) || null;
+  if (!p) { btn.disabled = true; btn.textContent = '🗑 Delete this profile'; note.textContent = ''; return; }
+  btn.textContent = '🗑 Delete profile "' + (p.name || 'Profile ' + p.profile_index) + '" (#' + p.profile_index + ')';
+  const g = profileDeleteGuard(p, S.profiles.length);
+  if (g.ok) {
+    btn.disabled = false;
+    note.textContent = 'Permanently deletes this profile and ALL of its data (addons, plugins, settings, watch data). Two confirmations are required, and the delete button only arms when you type the profile name exactly.';
+  } else {
+    btn.disabled = true;
+    note.textContent = '🔒 This profile cannot be deleted here: ' + g.reason + '.';
+  }
+}
+function startDeleteProfile() {
+  const p = S.profiles.find(x => x.profile_index === S.sel) || null;
+  const g = profileDeleteGuard(p, S.profiles.length);
+  if (!g.ok) { log('delete: refused, ' + g.reason); return; }
+  if (!confirm('Delete profile "' + (p.name || '') + '" (#' + p.profile_index + ')?\n\nIts addons, plugins, settings and data will be deleted from your Nuvio account. This cannot be undone, except by restoring from a backup.')) return;
+  pendingDeleteIdx = p.profile_index;
+  $('deleteWarnText').innerHTML = '⚠️ <b>Final step.</b> You are about to permanently delete profile <b>"' + esc(p.name || '') + '"</b> (#' + p.profile_index + '). Its addons, plugins, settings and data are deleted first, then the profile entry itself. Type <b>"' + esc(deleteExpectedText(p)) + '"</b> exactly below to arm the delete button.';
+  $('deleteConfirmInput').value = '';
+  $('deleteConfirmBtn').disabled = true;
+  $('deleteArmBox').classList.remove('hidden');
+  log('delete: first confirmation accepted for profile ' + p.profile_index + ' "' + (p.name || '') + '", waiting for the name to be typed to arm the final delete');
+}
+function onDeleteConfirmInput() {
+  const p = S.profiles.find(x => x.profile_index === pendingDeleteIdx) || null;
+  $('deleteConfirmBtn').disabled = !(p && deleteNameMatches($('deleteConfirmInput').value, p));
+}
+function cancelDeleteProfile() {
+  if (pendingDeleteIdx != null) log('delete: cancelled at the type-to-confirm step, nothing was deleted');
+  refreshDeleteUi();
+}
+async function deleteProfile(btn) {
+  const idx = pendingDeleteIdx;
+  if (idx == null) return;
+  btn.disabled = true;
+  $('deleteProfileBtn').disabled = true;
+  let dataDeleted = false;
+  try {
+    /* Step A: fresh pull, re-check the target still exists and is still deletable */
+    const fresh = await pullProfiles();
+    const target = fresh.find(p => p.profile_index === idx);
+    if (!target) {
+      log('delete: ABORTED, profile ' + idx + ' no longer exists on the server, nothing was deleted');
+      S.profiles = fresh;
+      if (fresh.length) {
+        const keep = fresh.some(p => p.profile_index === S.sel) ? S.sel : (fresh.find(p => p.is_primary) || fresh[0]).profile_index;
+        buildPicker(keep);
+        await selectProfile(keep);
+      }
+      return;
+    }
+    const g = profileDeleteGuard(target, fresh.length);
+    if (!g.ok) { log('delete: ABORTED, ' + g.reason + ', nothing was deleted'); return; }
+    if (!deleteNameMatches($('deleteConfirmInput').value, target)) {
+      log('delete: ABORTED, the typed name no longer matches profile ' + idx + ', nothing was deleted');
+      return;
+    }
+    log('delete: profile ' + idx + ' "' + (target.name || '') + '" confirmed on a fresh pull (' + fresh.length + ' profiles), deleting its data…');
+    /* Step B: delete the profile's data */
+    const origin = await ensureOriginId();
+    await req('/rest/v1/rpc/sync_delete_profile_data', { method: 'POST', body: { p_origin_client_id: origin, p_profile_id: idx } });
+    dataDeleted = true;
+    log('delete: profile ' + idx + ' data deleted (addons, plugins, settings, watch data)');
+    /* Step C: push the profiles list without the deleted entry */
+    const remaining = profilesWithout(fresh, idx);
+    log('delete: pushing the remaining ' + remaining.length + ' profile(s) with indexes [' + remaining.map(p => p.profile_index).join(', ') + ']');
+    await req('/rest/v1/rpc/sync_push_profiles', { method: 'POST', body: { p_client_max_profiles: remaining.length, p_origin_client_id: origin, p_profiles: remaining } });
+    log('delete: profiles list pushed without profile ' + idx);
+    /* Step D: verify on a fresh pull */
+    const after = await pullProfiles();
+    S.profiles = after;
+    if (after.some(p => p.profile_index === idx)) {
+      log('delete: verify ❌ profile ' + idx + ' is STILL in the profiles list after the push. Check the account before doing anything else.');
+    } else {
+      log('delete: verify ✅ profile ' + idx + ' is gone. ' + after.length + ' profile(s) remain: ' + after.map(p => '#' + p.profile_index + ' "' + (p.name || '') + '"').join(', '));
+    }
+    delete S.work[idx];
+    delete S.base[idx];
+    delete S.dirty[idx + ':addons'];
+    delete S.dirty[idx + ':plugins'];
+    delete S.undo[idx + ':addons'];
+    delete S.undo[idx + ':plugins'];
+    $('accountLine').textContent = $('accountLine').textContent.replace(/· \d+ profile\(s\)/, '· ' + after.length + ' profile(s)');
+    if (after.length) {
+      const next = after.find(p => p.is_primary) || after[0];
+      buildPicker(next.profile_index);
+      await selectProfile(next.profile_index);
+    }
+  } catch (e) {
+    if (dataDeleted) {
+      log('delete: ⚠️⚠️ PARTIAL STATE: profile ' + idx + "'s data was deleted, but removing its entry from the profiles list FAILED (" + e.message + '). The profile entry remains but its data is gone. This is recoverable: restore from a backup to bring the data back, or run this delete again to remove the empty entry.');
+      try {
+        S.profiles = await pullProfiles();
+        const keep = S.profiles.some(p => p.profile_index === S.sel) ? S.sel : (S.profiles[0] || {}).profile_index;
+        if (keep != null) buildPicker(keep);
+      } catch (e2) { }
+    } else {
+      log('error during profile delete: ' + e.message);
+    }
+  } finally {
+    refreshDeleteUi();
+  }
+}
+
 /* ---------- Backup + restore ---------- */
 function downloadJson(name, data) {
   const text = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
@@ -730,6 +879,10 @@ $('pushPluginsBtn').addEventListener('click', e => pushSection('plugins', e.curr
 $('undoAddonsBtn').addEventListener('click', e => undoSection('addons', e.currentTarget));
 $('undoPluginsBtn').addEventListener('click', e => undoSection('plugins', e.currentTarget));
 $('cloneBtn').addEventListener('click', e => cloneProfile(e.currentTarget));
+$('deleteProfileBtn').addEventListener('click', startDeleteProfile);
+$('deleteConfirmInput').addEventListener('input', onDeleteConfirmInput);
+$('deleteConfirmBtn').addEventListener('click', e => deleteProfile(e.currentTarget));
+$('deleteCancelBtn').addEventListener('click', cancelDeleteProfile);
 $('backupLocalBtn').addEventListener('click', e => backupLocal(e.currentTarget));
 $('backupServerBtn').addEventListener('click', e => backupServer(e.currentTarget));
 $('restoreFile').addEventListener('change', onRestoreFile);
