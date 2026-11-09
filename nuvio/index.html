@@ -46,7 +46,7 @@
 </head>
 <body>
 <h1>🎬 Nuvio Account Manager</h1>
-<div class="sub">Universal tool for your Nuvio account: profiles, addons, plugins, cloning, backup and restore, plus the Torrentio size cap as a preset. Everything runs through the official Nuvio Cloud API. <span class="dim">tool v2.0.0</span></div>
+<div class="sub">Universal tool for your Nuvio account: profiles, addons, plugins, cloning, backup and restore, plus Torrentio and Comet presets. Everything runs through the official Nuvio Cloud API. <span class="dim">tool v2.1.0</span></div>
 
 <div class="privacy">🔒 <b>How this page works:</b> it runs entirely in this browser tab and talks <b>only</b> to the official Nuvio API at <span class="mono">api.nuvio.tv</span>, the same API Nuvio's own apps use. Your password goes straight from this tab to Nuvio, it is <b>never stored</b>, and the sign-in token lives only in this tab's memory. Close the tab and everything is gone.</div>
 
@@ -204,6 +204,60 @@ function isTorrentio(a) {
   return (((a.name || '') + ' ' + (a.url || '')).toLowerCase().includes('torrentio'));
 }
 /* ---------- end Torrentio URL logic ---------- */
+
+/* ---------- Comet config logic (config = last URL segment, standard base64 of a compact JSON object) ---------- */
+function splitCometUrl(url) {
+  if (!url) return null;
+  const suffix = '/manifest.json';
+  let core = url, tail = '';
+  if (url.endsWith(suffix)) { core = url.slice(0, -suffix.length); tail = suffix; }
+  const i = core.lastIndexOf('/');
+  if (i < 0) return null;
+  const seg = core.slice(i + 1);
+  if (!seg) return null;
+  return { head: core.slice(0, i + 1), seg: seg, tail: tail };
+}
+function decodeCometConfig(url) {
+  const p = splitCometUrl(url);
+  if (!p) return null;
+  try {
+    const txt = decodeURIComponent(escape(atob(p.seg.replace(/-/g, '+').replace(/_/g, '/'))));
+    const obj = JSON.parse(txt);
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+    return obj;
+  } catch (e) { return null; }
+}
+function encodeCometConfig(obj) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+}
+function withCometConfig(url, obj) {
+  const p = splitCometUrl(url);
+  if (!p) return null;
+  return p.head + encodeCometConfig(obj) + p.tail;
+}
+function applyCometSettings(url, gb, cachedOnly, dedupe) {
+  const cfg = decodeCometConfig(url);
+  if (!cfg) return null;
+  cfg.maxSize = (!gb || isNaN(gb) || gb <= 0) ? 0 : Math.round(gb * Math.pow(1024, 3));
+  cfg.cachedOnly = !!cachedOnly;
+  cfg.deduplicateStreams = !!dedupe;
+  return withCometConfig(url, cfg);
+}
+function isComet(a) {
+  if (((a.name || '').toLowerCase()).includes('comet')) return true;
+  const url = a.url || '';
+  let host = url;
+  try { host = new URL(url).hostname; } catch (e) {
+    const m = /^[a-z][a-z0-9+.-]*:\/\/([^/]+)/i.exec(url);
+    if (m) host = m[1];
+  }
+  return String(host).toLowerCase().includes('comet');
+}
+function fmtGB(bytes) {
+  const gb = bytes / Math.pow(1024, 3);
+  return (Math.round(gb * 100) / 100) + ' GB';
+}
+/* ---------- end Comet config logic ---------- */
 
 const S = {
   token: null, originId: null,
@@ -366,6 +420,24 @@ function renderSection(kind) {
         '<input type="number" data-tgb value="40" min="1" max="1000"> GB ' +
         '<button class="small" data-act="setcap">Set cap (local)</button></div>';
     }
+    if (kind === 'addons' && isComet(row)) {
+      const cfg = decodeCometConfig(row.url);
+      if (!cfg) {
+        h += '<div class="torbox">☄️ <b>Comet settings</b><br><span class="bad">config could not be decoded</span></div>';
+      } else {
+        const svc = Array.isArray(cfg.debridServices) ? cfg.debridServices.map(s => esc((s && s.service) || '?')).join(', ') : '';
+        const ms = (typeof cfg.maxSize === 'number' && cfg.maxSize > 0) ? cfg.maxSize : 0;
+        h += '<div class="torbox">☄️ <b>Comet settings</b><br>' +
+          'debrid: <b>' + (svc || 'none set') + '</b>' +
+          ' · max size: <b>' + (ms === 0 ? 'no limit' : esc(fmtGB(ms))) + '</b>' +
+          ' · cached only: <b>' + (cfg.cachedOnly ? 'on' : 'off') + '</b>' +
+          ' · dedupe streams: <b>' + (cfg.deduplicateStreams ? 'on' : 'off') + '</b>' +
+          '<div style="margin-top:6px"><input type="number" data-cgb value="40" min="0" max="1000"> GB ' +
+          '<label class="chk"><input type="checkbox" data-ccached' + (cfg.cachedOnly ? ' checked' : '') + '> cached only</label> ' +
+          '<label class="chk"><input type="checkbox" data-cdedupe' + (cfg.deduplicateStreams ? ' checked' : '') + '> dedupe streams</label></div>' +
+          '<div style="margin-top:6px"><button class="small" data-act="cometapply">Apply Comet settings (local)</button></div></div>';
+      }
+    }
     h += '</div>';
     return h;
   }).join('');
@@ -404,6 +476,19 @@ function wireRow(kind, rowEl, i) {
     markDirty('addons');
     renderSection('addons');
     log('torrentio preset: local URL now ' + maskUrl(nu) + ' (cap ' + gb + 'gb), push addons to save it');
+  });
+  const cometBtn = rowEl.querySelector('[data-act="cometapply"]');
+  if (cometBtn) cometBtn.addEventListener('click', () => {
+    const gb = parseFloat(rowEl.querySelector('[data-cgb]').value);
+    const nu = applyCometSettings(row.url, gb, rowEl.querySelector('[data-ccached]').checked, rowEl.querySelector('[data-cdedupe]').checked);
+    if (!nu) { log('comet preset: config could not be decoded, no change made'); return; }
+    if (nu === row.url) { log('comet preset: settings already match, no change'); return; }
+    row.url = nu;
+    markDirty('addons');
+    renderSection('addons');
+    const nc = decodeCometConfig(nu) || {};
+    const ms = (typeof nc.maxSize === 'number' && nc.maxSize > 0) ? nc.maxSize : 0;
+    log('comet preset: max size ' + (ms === 0 ? 'no limit' : fmtGB(ms)) + ', cached only ' + (nc.cachedOnly ? 'on' : 'off') + ', dedupe ' + (nc.deduplicateStreams ? 'on' : 'off') + ' (local), push addons to save it');
   });
 }
 function addRow(kind) {
