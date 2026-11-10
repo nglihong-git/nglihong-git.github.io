@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tesla Automation, Explained | nglihong-git</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A plain-language tour of a personal Tesla automation system: schedule-aware warm-ups, precisely timed navigation, a live-traffic morning planner, and a strict cost budget. Built on Tesla's official Fleet API.">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b1020;
+    --panel: #121a2e;
+    --panel-2: #16213a;
+    --text: #eef3ff;
+    --muted: #a9b6d3;
+    --line: #26365e;
+    --accent: #7dd3fc;
+    --accent-2: #a78bfa;
+    --green: #34d399;
+    --amber: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: ui-sans-system, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background:
+      radial-gradient(circle at top left, rgba(125, 211, 252, 0.20), transparent 34rem),
+      radial-gradient(circle at top right, rgba(167, 139, 250, 0.16), transparent 30rem),
+      var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+  }
+  main { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 48px 0 56px; }
+  header { padding: 28px 0 18px; }
+  .eyebrow { color: var(--accent); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.78rem; }
+  h1 { font-size: clamp(2.2rem, 6vw, 4.2rem); line-height: 0.98; margin: 12px 0 16px; max-width: 820px; }
+  .intro { color: var(--muted); max-width: 820px; font-size: 1.08rem; margin: 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 22px; }
+  section { margin-top: 38px; }
+  h2 { font-size: 1.35rem; margin: 0 0 6px; }
+  .section-note { color: var(--muted); margin: 0; max-width: 800px; }
+  .card {
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 3px 9px; font-size: 0.78rem; font-weight: 700; color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .badge.core { color: var(--accent); }
+  .badge.guard { color: var(--amber); }
+  .card h3 { margin: 0 0 8px; font-size: 1.22rem; }
+  .card p { color: var(--muted); margin: 0 0 10px; }
+  .card p:last-child { margin-bottom: 0; }
+  .meta { font-size: 0.9rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; margin-top: 14px; }
+  .links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+  a.button, a.link {
+    color: var(--text); text-decoration: none; border: 1px solid var(--line);
+    border-radius: 999px; padding: 8px 13px; font-weight: 700; background: rgba(255,255,255,0.04);
+  }
+  a.button { background: var(--accent); color: #082f49; border-color: transparent; }
+  a:hover { filter: brightness(1.1); }
+  code { color: var(--accent); background: rgba(125, 211, 252, 0.10); padding: 0.1rem 0.3rem; border-radius: 6px; }
+  .steps { display: grid; gap: 10px; margin-top: 16px; }
+  .step { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; background: rgba(255,255,255,0.03); color: var(--muted); }
+  .step strong { color: var(--text); }
+  .step .n { color: var(--accent); font-weight: 800; margin-right: 8px; }
+  .timeline { display: grid; gap: 10px; margin-top: 16px; }
+  .tick { display: grid; grid-template-columns: 118px 1fr; gap: 14px; border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px; background: rgba(255,255,255,0.03); }
+  .tick .when { color: var(--accent); font-weight: 700; font-size: 0.95rem; }
+  .tick .what { color: var(--muted); }
+  .tick .what strong { color: var(--text); }
+  footer { color: var(--muted); border-top: 1px solid var(--line); margin-top: 38px; padding-top: 18px; font-size: 0.92rem; }
+  @media (max-width: 560px) { .tick { grid-template-columns: 1fr; gap: 4px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">Tesla Automation</div>
+    <h1>A car that is ready when you are</h1>
+    <p class="intro">This is a personal automation system built on Tesla's official Fleet API. It watches a schedule of recurring activities, warms or cools the cabin at the right moment, loads the driving route at exactly the right time, and plans the morning drive around live traffic. Nobody has to remember any of it, tap anything, or open an app. This page explains every feature in plain language, and then how the pieces work under the hood.</p>
+    <div class="links">
+      <a class="button" href="/">Back to the hub</a>
+      <a class="link" href="#features">The features</a>
+      <a class="link" href="#how">How it works</a>
+      <a class="link" href="#day">A day in the life</a>
+    </div>
+  </header>
+
+  <section id="features" aria-labelledby="features-h">
+    <h2 id="features-h">The features</h2>
+    <p class="section-note">Ten pieces, each doing one job. Throughout this page the examples use a generic setup: a home base, and a regularly visited destination a short drive away.</p>
+    <div class="grid">
+
+      <article class="card">
+        <div class="badge core">Schedule</div>
+        <h3>1. It follows your schedule</h3>
+        <p>A small watcher checks the inbox every 45 seconds for booking confirmations from the scheduling service. But an email is only treated as a doorbell, never as proof. Every time one arrives, the system goes and reads the live schedule at the source and trusts only that.</p>
+        <p>Cancellations are picked up the same way and remove everything they created. A waitlist spot does not count as a booking at all; it only becomes real if it later converts into a confirmed reservation.</p>
+        <div class="meta">Result: the system always works from the true, current schedule, never from stale email.</div>
+      </article>
+
+      <article class="card">
+        <div class="badge core">Warm-up</div>
+        <h3>2. The car warms itself</h3>
+        <p>Instead of depending on an outside system at the crucial moment, the week's schedule is copied into the car's own built-in preconditioning schedule. The car then warms or cools itself, on its own, even if the home internet or the automation server is down that day.</p>
+        <p>Only the current week is copied, because the car's built-in schedules repeat by weekday rather than by date. Loading next week's activity early would make it fire on the wrong week. All the changes for a day are batched into a single session with the car, which keeps costs down.</p>
+        <div class="meta">Result: warm-up keeps working even when everything else is offline.</div>
+      </article>
+
+      <article class="card">
+        <div class="badge core">Warm-up</div>
+        <h3>3. Weather-smart timing</h3>
+        <p>A parked car's cabin is not the same temperature as the air outside. It soaks up the cold overnight and bakes in the sun during the day. So before each warm-up, the system estimates the actual cabin temperature from the hourly forecast, looking at the coldest stretch of the previous 12 hours and the expected sun load.</p>
+        <p>Normal day: warm-up starts about 5 minutes ahead. Extreme day, meaning a deep freeze at or below 30&deg;F (-1&deg;C), a sun-loaded cabin at or above 120&deg;F (49&deg;C), or snow and ice: 10 minutes ahead. If the weather service is unreachable, the system quietly falls back to the normal timing instead of failing.</p>
+        <div class="meta">Result: enough warm-up for the day the car actually experienced, never more.</div>
+      </article>
+
+      <article class="card">
+        <div class="badge guard">Common sense</div>
+        <h3>4. Location gates</h3>
+        <p>The system knows two places: home, and the destination. Warm-up before an activity only happens if the car is genuinely at home. Warm-up for the trip back only happens if the car is genuinely at the destination. Anywhere else, a parking garage across town, a friend's driveway, on the road already, it does nothing at all.</p>
+        <p>This sounds obvious, but it is the rule that prevents almost every embarrassing automation mistake: the car is never warmed, routed, or woken for a trip it is not about to make.</p>
+        <div class="meta">Result: no warm car sitting in the wrong place, ever.</div>
+      </article>
+
+      <article class="card">
+        <div class="badge core">Backup</div>
+        <h3>5. A backup checker</h3>
+        <p>Every 15 minutes, a separate checker asks three questions about any activity coming due: is the booking still real (re-checked live, so a last-minute cancellation is honored), is the car in the right place, and did the warm-up actually happen?</p>
+        <p>If the car's own schedule missed for any reason, the checker starts the climate itself, using the same weather-smart timing. If everything already worked, it stays completely silent.</p>
+        <div class="meta">Result: two independent layers have to fail before anyone steps into a cold car.</div>
+      </article>
+
+      <article class="card">
+        <div class="badge core">Navigation</div>
+        <h3>6. The route, at the right moment</h3>
+        <p>Sending the destination to the car is handled by its own dedicated timing service, deliberately separate from warm-up. Warm-up tolerates a few minutes of drift; a route does not, because it has to arrive before the driver leaves, not after.</p>
+        <p>The outbound route to the destination is sent 30 minutes before the activity starts, matched to a real departure habit of leaving 15 to 25 minutes ahead. The route home is sent at the exact moment the activity ends. The service checks the clock every 30 seconds, so sends land on the minute instead of whenever a slower checker happens to wake up.</p>
+        <p>Booked late? If an activity is booked inside that 30 minute window, the route is sent the moment the booking is discovered instead of never, as long as the car is still at home. Booked after the activity already started, and only the route home is sent, right on time at the end.</p>
+        <div class="meta">Result: the route is on the screen before every departure, with no tapping.</div>
+      </article>
+
+      <article class="card">
+        <div class="badge core">Morning drive</div>
+        <h3>7. Planned by live traffic</h3>
+        <p>On weekday mornings the question flips: instead of "when does it start," it is "when must we leave to arrive by a set time?" Starting early in the morning, the system asks a live traffic service that question directly, in arrive-by mode, and recomputes the answer every 10 minutes as traffic builds or clears.</p>
+        <p>When the departure time settles, the car is warmed using the same weather-smart lead, and the route to the destination is sent in the same moment as the warm-up command, so the drive plan is on screen while the cabin warms. If the car is still sitting at home 5 minutes after the planned departure, a leave-now alert goes out. If the traffic service itself fails, the plan falls back to a fixed, known drive time rather than no plan at all.</p>
+        <div class="meta">Result: the leave time follows the traffic, not a guess made the night before.</div>
+      </article>
+
+      <article class="card">
+        <div class="badge core">Learning</div>
+        <h3>8. It learns from every trip</h3>
+        <p>Traffic forecasts are good, but they are not perfect for a specific route at a specific time of day. So after each morning drive, the system compares the planned arrival with the actual arrival and remembers the difference.</p>
+        <p>Tomorrow's departure is then adjusted by the typical error from the last 10 trips (the median, so one freak accident day cannot skew it), and the adjustment itself is capped so it can never grow into something silly. The plan quietly gets more accurate the longer it runs, with no settings to tune.</p>
+        <div class="meta">Result: a departure time tuned to this route, this driver, this hour.</div>
+      </article>
+
+      <article class="card">
+        <div class="badge guard">Budget</div>
+        <h3>9. A strict spending budget</h3>
+        <p>Talking to a car through the manufacturer's API is not free; the manufacturer includes a small monthly credit and bills beyond it. Every part of this system, the mirror, the backup checker, the navigation service, the morning planner, spends through one shared ledger, and every component checks the ledger before it acts.</p>
+        <p>There is a hard monthly stop set below the included credit. If it is ever reached, everything halts and reports instead of running up a bill. The design also spends carefully on purpose: cheap status reads before expensive ones, batched changes instead of many small ones, and a sleeping car is woken at most once per job, which matters in an underground garage where the signal is weak and retries are costly.</p>
+        <div class="meta">Result: the whole system runs inside the free monthly credit, by construction.</div>
+      </article>
+
+      <article class="card">
+        <div class="badge guard">Quiet by design</div>
+        <h3>10. Silent unless it matters</h3>
+        <p>The watchers are small, ordinary programs, not AI agents burning resources on a timer. They poll quietly in the background and only wake the assistant up when something real happens: a new booking, a failure, a decision that needs a human.</p>
+        <p>Successes are silent. There are no "your car is warming up" notifications and no daily summaries nobody asked for. Failures, on the other hand, are reported the same day, with the reason and what is being done about them. When life changes, for example when someone else starts using the car on weekdays, the system can be put into a trial mode where it keeps tracking everything but only observes, until the new routine is understood.</p>
+        <div class="meta">Result: attention is spent only where attention helps.</div>
+      </article>
+
+    </div>
+  </section>
+
+  <section id="how" aria-labelledby="how-h">
+    <h2 id="how-h">How it works, under the hood</h2>
+    <p class="section-note">No magic, just a few small parts with clear jobs, each writing down what it did so the next one never has to guess.</p>
+    <div class="steps">
+      <div class="step"><span class="n">1</span><strong>Listeners watch.</strong> Small always-on programs check the inbox (every 45 seconds) and the clocks (every 30 seconds for navigation, every 10 minutes for the morning plan). They cost almost nothing and do not involve AI unless something actually happens.</div>
+      <div class="step"><span class="n">2</span><strong>Everything is verified at the source.</strong> Emails and cached data only trigger a check. The live schedule from the booking service is the single source of truth for what exists, and the car's own reported position is the truth for where it is.</div>
+      <div class="step"><span class="n">3</span><strong>Planners compute the moments.</strong> A weather rule decides warm-up leads. A traffic service decides morning departures. A precision timer decides route sends. Each planner only computes; separate, simple code acts.</div>
+      <div class="step"><span class="n">4</span><strong>One door to the car.</strong> All communication with the car goes through Tesla's official Fleet API and one shared set of helper tools, which sign each command, enforce the shared budget ledger, and refuse to overspend. There is no unofficial back door.</div>
+      <div class="step"><span class="n">5</span><strong>State is written down.</strong> Every component keeps a small record file: bookings seen, schedules mirrored, routes sent, trips measured. Before acting, a component reads its record. Nothing relies on remembering a conversation or an old message.</div>
+      <div class="step"><span class="n">6</span><strong>Events wake the assistant.</strong> When a listener spots something that needs judgment, a new booking, a failed send, a stopped budget, it raises an event. Only then does the assistant step in, look, and either fix it or report it the same day.</div>
+    </div>
+  </section>
+
+  <section id="day" aria-labelledby="day-h">
+    <h2 id="day-h">A day in the life</h2>
+    <p class="section-note">One ordinary day, with a generic activity booked for 5:30 PM at a destination a few minutes from home, and a morning drive that has to arrive by 8:30 AM.</p>
+    <div class="timeline">
+      <div class="tick"><div class="when">Days before</div><div class="what"><strong>The booking lands.</strong> A confirmation email arrives; within about two minutes the live schedule is verified, the activity is recorded, and the car's own warm-up schedule for the week quietly includes it.</div></div>
+      <div class="tick"><div class="when">5:45 AM</div><div class="what"><strong>The morning plan starts forming.</strong> The traffic service is asked when to leave for an 8:30 AM arrival, and the question is re-asked every 10 minutes as the roads change.</div></div>
+      <div class="tick"><div class="when">~7:30 AM</div><div class="what"><strong>Warm car, route ready.</strong> A few minutes before the computed departure, adjusted by what the system has learned from previous trips, the cabin starts warming and the route appears on the car's screen in the same moment.</div></div>
+      <div class="tick"><div class="when">~8:30 AM</div><div class="what"><strong>The trip is graded.</strong> Actual arrival is compared with the plan, and the difference is folded into tomorrow's departure time.</div></div>
+      <div class="tick"><div class="when">5:00 PM</div><div class="what"><strong>The evening route goes out.</strong> Thirty minutes before the activity, the destination is sent to the car, still parked at home. Warm-up follows on its own schedule, weather-adjusted.</div></div>
+      <div class="tick"><div class="when">6:45 PM</div><div class="what"><strong>Home, on time.</strong> The moment the activity ends, the route home is sent and the car, parked at the destination, is warmed for the drive back.</div></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="principles-h">
+    <h2 id="principles-h">Design principles</h2>
+    <div class="steps">
+      <div class="step"><strong>Official channels only.</strong> The manufacturer's public API, real accounts, real schedules. If a capability is not offered officially, the system does without it.</div>
+      <div class="step"><strong>Verify, then act.</strong> No action is ever taken from a notification, a screenshot, or a memory. The live source is checked first, every time.</div>
+      <div class="step"><strong>One owner per job.</strong> Navigation has exactly one sender, warm-up exactly one primary mechanism with one backup. Two systems doing the same job is how duplicates and races happen.</div>
+      <div class="step"><strong>Fail quiet, report loud.</strong> Outages fall back to safe defaults (normal warm-up timing, a fixed drive time) instead of breaking, and anything that truly fails is reported the same day with its reason.</div>
+    </div>
+  </section>
+
+  <footer>Tesla Automation feature guide, version 1.0.0 · A personal project built on Tesla's official Fleet API. Not affiliated with Tesla, Inc. Details are generalized; no locations, accounts, or schedules are shown. <a class="link" href="/">Back to the hub</a></footer>
+</main>
+</body>
+</html>
