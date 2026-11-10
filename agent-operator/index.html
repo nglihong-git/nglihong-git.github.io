@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Agent Operator: a field profile</title>
+<meta name="description" content="An anonymized profile of someone who runs daily life on AI agents: whole-outcome delegation, tokenless background automation, verified outcomes, and a scorecard you can copy.">
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2d333b;
+    --ink:#e6edf3; --dim:#9aa7b4; --accent:#7ee787; --accent2:#79c0ff;
+    --warn:#f0b429; --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55;}
+  .wrap{max-width:920px;margin:0 auto;padding:24px 18px 64px}
+  header.hero{padding:44px 0 10px}
+  .kicker{color:var(--accent);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:.78rem}
+  h1{font-size:2.35rem;line-height:1.15;margin:.35em 0 .3em}
+  h2{font-size:1.45rem;margin:1.6em 0 .5em}
+  h3{font-size:1.05rem;margin:0 0 .3em}
+  p{color:var(--ink)}
+  .dim{color:var(--dim)}
+  .lede{font-size:1.12rem;color:var(--dim);max-width:44em}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:26px 0 6px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+  .stat b{display:block;font-size:1.55rem;color:var(--accent2)}
+  .stat span{color:var(--dim);font-size:.88rem}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:12px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+  .card p{margin:.2em 0;color:var(--dim);font-size:.95rem}
+  .card .ico{font-size:1.3rem}
+  ol.rules{counter-reset:r;list-style:none;padding:0}
+  ol.rules li{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 16px 14px 58px;margin:10px 0;position:relative}
+  ol.rules li::before{counter-increment:r;content:counter(r);position:absolute;left:16px;top:13px;
+    width:28px;height:28px;border-radius:50%;background:var(--panel2);color:var(--accent);
+    display:flex;align-items:center;justify-content:center;font-weight:700}
+  ol.rules p{margin:.15em 0;color:var(--dim);font-size:.95rem}
+  .ladder{display:grid;gap:8px;margin:14px 0}
+  .rung{display:flex;gap:12px;align-items:baseline;background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+  .rung b{color:var(--accent2);white-space:nowrap}
+  .rung span{color:var(--dim);font-size:.94rem}
+  .score-head{display:flex;flex-wrap:wrap;gap:16px;align-items:center;background:var(--panel2);
+    border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin:14px 0}
+  .big-score{font-size:2.6rem;font-weight:800;color:var(--accent);line-height:1}
+  .tier{font-weight:700}
+  .dim-row{margin:12px 0}
+  .dim-top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+  .dim-top b{font-size:1rem}
+  .dim-top .val{color:var(--accent2);font-weight:700;white-space:nowrap}
+  .bar{height:10px;background:#0a0e13;border:1px solid var(--line);border-radius:99px;overflow:hidden;margin:6px 0 4px}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:99px}
+  .dim-row p{margin:0;color:var(--dim);font-size:.92rem}
+  table{width:100%;border-collapse:collapse;font-size:.94rem}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel2)}
+  td{color:var(--dim)} td b{color:var(--ink)}
+  code{background:#0a0e13;border:1px solid var(--line);border-radius:6px;padding:.05em .35em;font-size:.9em}
+  .note{background:var(--panel);border-left:4px solid var(--warn);border-radius:8px;padding:12px 16px;color:var(--dim)}
+  footer{margin-top:44px;color:var(--dim);font-size:.9rem;border-top:1px solid var(--line);padding-top:16px}
+  a{color:var(--accent2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="kicker" id="kicker"></div>
+  <h1 id="headline"></h1>
+  <p class="lede" id="lede"></p>
+  <div class="stats" id="stats"></div>
+</header>
+
+<h2>🧑‍🚀 Who this is</h2>
+<p id="about"></p>
+<p class="dim">This page is deliberately anonymized. No name, no employer, no hometown, no account handles, no dollar figures that point at a real household. The systems are real; the identity is not on the page. That split is itself one of the working rules below.</p>
+
+<h2>🧭 The operating principles</h2>
+<p class="dim">These are not aspirations. They are the standing rules the agents actually run under, earned one correction at a time. Every time something went wrong, the fix became a permanent rule, at the broadest scope it applied to.</p>
+<ol class="rules" id="rules"></ol>
+
+<h2>🛰️ What runs while nobody is watching</h2>
+<p class="dim">A small fleet of background systems, each boring on purpose. Code does the watching. Agents wake up only when something real happens, and stay silent when nothing changed.</p>
+<div class="grid" id="systems"></div>
+
+<h2>🪜 How deep it goes</h2>
+<p class="dim">Most people stop at the first rung. This practice lives at the bottom of the ladder, and treats each rung as a floor, not a ceiling.</p>
+<div class="ladder" id="ladder"></div>
+
+<h2>📊 The scorecard</h2>
+<p class="dim">Self-scored against the rubric under it. The rule for scoring yourself: a dimension only counts if you can point at a working system or a written rule that proves it. Vibes score zero.</p>
+<div class="score-head">
+  <div class="big-score" id="overall"></div>
+  <div>
+    <div class="tier" id="tier"></div>
+    <div class="dim" id="tier-note"></div>
+  </div>
+</div>
+<div id="scorecard"></div>
+
+<h2>🏅 The rubric, so you can score yourself</h2>
+<table>
+  <tr><th>Level</th><th>Name</th><th>What it looks like</th></tr>
+  <tr><td><b>1</b></td><td><b>Curious</b></td><td>Asks chatbots questions. Every task starts and ends inside one chat window.</td></tr>
+  <tr><td><b>2</b></td><td><b>Power user</b></td><td>Saved prompts, custom instructions, a few favorite tools. Still does every step by hand.</td></tr>
+  <tr><td><b>3</b></td><td><b>Automator</b></td><td>Scheduled jobs and reminders run unattended. Agents draft, summarize, and fetch on a cadence.</td></tr>
+  <tr><td><b>4</b></td><td><b>Systems builder</b></td><td>Builds custom tools, connectors, and pipelines for the agent to use. Work continues between chats, with logs.</td></tr>
+  <tr><td><b>5</b></td><td><b>Operator</b></td><td>Delegates whole outcomes across life and work. Event-driven automation, verified results, audit trails, standing rules that compound. The human decides; the systems execute.</td></tr>
+</table>
+
+<h2>📋 Steal this page</h2>
+<p>This page is a template wearing a filled-in example. Everything personal lives in <b>one config block</b> at the top of the page source, marked <code>PROFILE CONFIG</code>. To make your own:</p>
+<ol>
+  <li>Copy <code>index.html</code> and <code>TEMPLATE.md</code> from this folder in the repository.</li>
+  <li>Edit only the config block: your stats, your rules, your systems, your scores. The layout takes care of itself.</li>
+  <li>Score yourself honestly against the rubric. If there is no working system or written rule behind a number, lower the number.</li>
+  <li>Anonymize the way this page does: describe the practice, never the person. Systems yes, identity no.</li>
+  <li>Publish anywhere static: GitHub Pages, a plain web host, or a single file you send around.</li>
+</ol>
+<p class="note">⚠️ One caution worth copying too: the deeper agents reach into real life, the more the guardrails matter. Approvals for anything irreversible, secrets in a vault and nowhere else, and verification over trust are what make the rest of this page safe to run.</p>
+
+<footer>
+  <p>An anonymized field profile of an AI agent practice. Built with the same method it describes: delegated as an outcome, assembled by an agent, verified live before anyone called it done.</p>
+  <p>Template version 1.0.0. Copy it, score yourself, pass it on.</p>
+</footer>
+
+</div>
+
+<script>
+/* ================================================================
+   PROFILE CONFIG: this is the only block you need to edit to make
+   this page yours. Replace the values, keep the shape.
+   ================================================================ */
+const PROFILE = {
+  kicker: "Field profile · an AI agent practice",
+  headline: "The Agent Operator",
+  lede: "One person. No engineering team, no IT department. Just a standing fleet of AI agents and quiet background systems that run the mundane parts of life end to end, so the human only handles the parts that need a human.",
+  about: "By day, a busy professional with a full calendar and a fuller inbox. By inclination, a systems thinker who got tired of being the integration layer between their own apps. Instead of doing tasks, they describe outcomes, hand them to an agent, and audit the results. Over time that habit grew into a practice: custom-built tools, always-on automations, and a rulebook that gets stricter every time reality teaches it something. The agent is treated like a trusted chief of staff with root access to the boring parts of life, and with hard approval gates around anything that cannot be undone.",
+  stats: [
+    { value: "24/7", label: "background systems watching inboxes, prices, deadlines, and schedules" },
+    { value: "15+", label: "standing automations running with zero daily attention" },
+    { value: "5+", label: "custom API clients and connectors built for the agent to use" },
+    { value: "100%", label: "of irreversible actions gated behind an explicit approval" }
+  ],
+  rules: [
+    { title: "Delegate outcomes, not steps",
+      text: "The ask is never 'do step 3 for me'. It is 'own this until it is done'. The agent plans, executes, verifies, and reports. If a step needs the human's hands, the system redesigns itself until it does not." },
+    { title: "Agents own it end to end",
+      text: "A handed-off task stays owned: failures get reported the same day, with the reason and the fix already in motion, and the work retries until it lands. Silence means it worked, not that it was forgotten." },
+    { title: "Tokenless by default",
+      text: "Watching is a job for cheap code, not for a language model. Small programs poll every 30 to 60 seconds and wake an agent only on a real event. Model attention is the scarcest resource in the system, so it is spent only on judgment." },
+    { title: "Verify, never trust a success message",
+      text: "A green checkmark is a claim, not a fact. Outcomes get confirmed against the real state: the order exists, the setting actually changed, the file is really there. Anything less is a rumor." },
+    { title: "Everything leaves an audit trail",
+      text: "Each project keeps a dated build log: what was done, when, on what evidence, and how to reproduce it. Future sessions, and future skepticism, can replay every decision." },
+    { title: "Secrets live in exactly one place",
+      text: "Credentials sit in a secure vault and are used at the moment of need. They never appear in code, logs, reports, or chat. A system that needs a password sprinkled through it is a system designed wrong." },
+    { title: "Approvals for the irreversible",
+      text: "Sending, spending, deleting, and committing all stop at a human yes, scoped to the exact wording, card, or action approved. A yes to one thing is never a yes to its neighbors." },
+    { title: "Corrections become standing rules",
+      text: "When the human corrects the agent once, the correction is written down at the broadest scope it deserves and applied everywhere, including in side projects and future sessions. Nobody should have to teach the same lesson twice." },
+    { title: "One-tap or it does not ship",
+      text: "Any workflow that asks the human to copy, paste, retype, or babysit is a design failure. Approvals are one tap. Handoffs are zero. If the agent cannot do it alone, it says so plainly instead of dressing a chore up as a deliverable." }
+  ],
+  systems: [
+    { icon: "🚗", title: "The car runs itself",
+      text: "A connected car that reads the day's bookings and traffic on its own: warming the cabin before departure, timing a morning commute to live road conditions, sending its own navigation. Weather changes the plan; nobody touches an app." },
+    { icon: "📥", title: "Inboxes that triage themselves",
+      text: "Listeners watch the mail for the handful of messages that matter: booking confirmations, one-time codes, support replies, bills. Real events wake an agent in seconds. Everything else waits quietly." },
+    { icon: "🏷️", title: "Money left on tables, collected",
+      text: "Daily coupon and benefit activation, price-drop watches with drafted outreach, rewards programs checked in until they pay out in full. Small numbers, relentlessly harvested, each one verified rather than assumed." },
+    { icon: "🗂️", title: "Documents that file themselves",
+      text: "Receipts and statements are read with OCR, checked by arithmetic before they are believed, sorted into a strict folder system, and logged for expenses and taxes. Paper in, clean records out." },
+    { icon: "📅", title: "Deadlines that cannot slip",
+      text: "Government filings, expiring benefits, enrollment windows, case milestones months away. Each one has a watcher with its name on it, and the watchers themselves get checked by safety-net jobs." },
+    { icon: "💬", title: "Conversations, handled with manners",
+      text: "Marketplace replies, support threads, and follow-ups drafted or sent in the human's own voice and first person, with anything resembling a commitment escalated for a real yes first. Support answers arrive as their own alert, never buried." }
+  ],
+  ladder: [
+    { rung: "Rung 1 · Chat", text: "Asking a model questions and pasting the answers somewhere useful." },
+    { rung: "Rung 2 · Instructions", text: "Custom instructions, saved context, a memory that persists between sessions and compounds." },
+    { rung: "Rung 3 · Tools", text: "The agent gets hands: browsers, files, calendars, messages, payments, real accounts." },
+    { rung: "Rung 4 · Schedule", text: "Work runs on clocks and cadences. Digests arrive, checks repeat, nothing depends on remembering." },
+    { rung: "Rung 5 · Events", text: "Code-level listeners watch the world and wake the agent only when something real happens. Self-healing services restart themselves." },
+    { rung: "Rung 6 · Custom builds", text: "When no tool exists, one gets built: API clients, signed-command tooling for a car, OCR pipelines, site workarounds, each with its own build log." },
+    { rung: "Rung 7 · Orchestration", text: "Agents delegate to agents. Parallel research, background builds, scheduled fleets, budgets and rate limits treated as engineering constraints." },
+    { rung: "Rung 8 · Operations", text: "The practice itself is managed: token budgets, protected core jobs, post-mortems that turn into rules, and an alignment record that tracks how well the agent actually understands the human." }
+  ],
+  scorecard: [
+    { dimension: "Delegation scope", score: 9.5,
+      evidence: "Whole domains run agent-owned: vehicle, inbox, shopping, benefits, documents, deadlines. Tasks arrive as outcomes and leave as verified results." },
+    { dimension: "Automation architecture", score: 9.0,
+      evidence: "Event-driven listeners with agent wake-up only on real events, safety-net jobs watching the watchers, fallbacks designed before they are needed." },
+    { dimension: "Verification discipline", score: 9.5,
+      evidence: "No result is reported from a success message alone. States get re-read, documents get arithmetic-checked, claims get primary sources." },
+    { dimension: "Tool building", score: 8.5,
+      evidence: "Multiple custom API clients and connectors built and maintained, including signed vehicle commands and a private OCR pipeline. Docked half a point: builds lean on the agent's general knowledge more than on deep original engineering." },
+    { dimension: "Context and memory engineering", score: 9.0,
+      evidence: "Layered memory: durable facts, per-project logs, per-conversation rules, and a nightly alignment synthesis. Corrections propagate across every context the agent works in." },
+    { dimension: "Orchestration and scheduling", score: 9.0,
+      evidence: "Dozens of scheduled jobs with owners, stop conditions, and delivery rules. Parallel sub-agents for research and builds. Token spend is budgeted and defended." },
+    { dimension: "Safety and approval hygiene", score: 8.5,
+      evidence: "Vault-only secrets, one-tap approvals scoped to exact actions, first-person voice rules for outward messages, no invented evidence ever. Docked for how much surface area one household's automation naturally accumulates." },
+    { dimension: "Iteration speed", score: 9.5,
+      evidence: "Ideas go from sentence to running system in a single sitting, then get corrected live, in the car, in the moment. The loop from failure to standing rule is measured in minutes." }
+  ]
+};
+
+/* ===== rendering (no need to edit below this line) ===== */
+const $ = id => document.getElementById(id);
+$("kicker").textContent = PROFILE.kicker;
+$("headline").textContent = PROFILE.headline;
+$("lede").textContent = PROFILE.lede;
+$("about").textContent = PROFILE.about;
+$("stats").innerHTML = PROFILE.stats.map(s =>
+  `<div class="stat"><b>${s.value}</b><span>${s.label}</span></div>`).join("");
+$("rules").innerHTML = PROFILE.rules.map(r =>
+  `<li><h3>${r.title}</h3><p>${r.text}</p></li>`).join("");
+$("systems").innerHTML = PROFILE.systems.map(s =>
+  `<div class="card"><div class="ico">${s.icon}</div><h3>${s.title}</h3><p>${s.text}</p></div>`).join("");
+$("ladder").innerHTML = PROFILE.ladder.map(l =>
+  `<div class="rung"><b>${l.rung}</b><span>${l.text}</span></div>`).join("");
+const overall = PROFILE.scorecard.reduce((a, d) => a + d.score, 0) / PROFILE.scorecard.length;
+$("overall").textContent = overall.toFixed(1) + " / 10";
+$("tier").textContent = "Level 5 of 5 · Operator";
+$("tier-note").textContent = "Average across " + PROFILE.scorecard.length + " dimensions, scored against working systems, not intentions.";
+$("scorecard").innerHTML = PROFILE.scorecard.map(d => `
+  <div class="dim-row">
+    <div class="dim-top"><b>${d.dimension}</b><span class="val">${d.score.toFixed(1)}</span></div>
+    <div class="bar"><i style="width:${d.score * 10}%"></i></div>
+    <p>${d.evidence}</p>
+  </div>`).join("");
+</script>
+</body>
+</html>
